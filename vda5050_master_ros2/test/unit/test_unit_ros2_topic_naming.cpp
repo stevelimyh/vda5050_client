@@ -55,6 +55,34 @@ TEST(Ros2TopicNamingTest, MixedAlphanumeric_OnlyLeadingMatters)
   EXPECT_EQ(to_ros2_topic_segment("42agv"), "_42agv");
 }
 
+TEST(Ros2TopicNamingTest, Hyphen_IsReplacedWithUnderscore)
+{
+  EXPECT_EQ(to_ros2_topic_segment("KION-001"), "KION_001");
+  EXPECT_EQ(to_ros2_topic_segment("JG-12-7"), "JG_12_7");
+  EXPECT_EQ(to_ros2_topic_segment("-leading"), "_leading");
+  EXPECT_EQ(to_ros2_topic_segment("trailing-"), "trailing_");
+}
+
+TEST(Ros2TopicNamingTest, Period_IsReplacedWithUnderscore)
+{
+  EXPECT_EQ(to_ros2_topic_segment("agv.42"), "agv_42");
+  EXPECT_EQ(to_ros2_topic_segment("a.b.c"), "a_b_c");
+  EXPECT_EQ(to_ros2_topic_segment("3.14"), "_3_14");
+}
+
+TEST(Ros2TopicNamingTest, Colon_IsReplacedWithUnderscore)
+{
+  EXPECT_EQ(to_ros2_topic_segment("vendor:robot:7"), "vendor_robot_7");
+  EXPECT_EQ(to_ros2_topic_segment(":start"), "_start");
+}
+
+TEST(Ros2TopicNamingTest, OtherSpecialChars_AlsoReplaced)
+{
+  EXPECT_EQ(to_ros2_topic_segment("Robot Company"), "Robot_Company");
+  EXPECT_EQ(to_ros2_topic_segment("a@b"), "a_b");
+  EXPECT_EQ(to_ros2_topic_segment("a/b"), "a_b");
+}
+
 TEST(Ros2TopicNamingTest, NeedsSanitization_MatchesTransformation)
 {
   // Contract: needs_topic_sanitization(s) == true iff to_ros2_topic_segment(s)
@@ -62,9 +90,13 @@ TEST(Ros2TopicNamingTest, NeedsSanitization_MatchesTransformation)
   EXPECT_TRUE(needs_topic_sanitization("001"));
   EXPECT_TRUE(needs_topic_sanitization("3M"));
   EXPECT_TRUE(needs_topic_sanitization(""));
+  EXPECT_TRUE(needs_topic_sanitization("KION-001"));
+  EXPECT_TRUE(needs_topic_sanitization("agv.42"));
+  EXPECT_TRUE(needs_topic_sanitization("vendor:robot"));
   EXPECT_FALSE(needs_topic_sanitization("KION"));
   EXPECT_FALSE(needs_topic_sanitization("S001"));
   EXPECT_FALSE(needs_topic_sanitization("_001"));
+  EXPECT_FALSE(needs_topic_sanitization("agv_42"));
 }
 
 }  // namespace vda5050_master_ros2::internal::test

@@ -33,6 +33,40 @@ streams — async observers subscribe without polling.
 | `/<ns>/<mfg>/<serial>/device_status` | `vda5050_master_ros2/DeviceStatus` | Combined snapshot — single-subscription convenience for consumers that want one topic instead of three |
 | `/<ns>/<mfg>/<serial>/order_status` | `vda5050_master_ros2/OrderStatus` | Master's lifecycle view: phase + last_node + base/horizon counts + action_states + errors |
 
+#### ROS 2 topic-name sanitization for `<mfg>` and `<serial>`
+
+VDA5050 allows `serialNumber` characters `A-Z a-z 0-9 _ . : -`, and places
+no character restriction on `manufacturer`. ROS 2 topic name *segments*
+are stricter — each must match `^[A-Za-z_][A-Za-z0-9_]*$`. When a vendor
+identity contains a leading digit or any of `. : -` (or other non-
+`[A-Za-z0-9_]` chars), master rewrites the **ROS 2 topic path only**.
+MQTT subscriptions, the master's internal AGV cache, and service request
+payloads always use the raw `(manufacturer, serial_number)` values.
+
+Rule (applies to each `<mfg>` / `<serial>` segment independently):
+
+1. Replace any character outside `[A-Za-z0-9_]` with `_`.
+2. If the result then starts with a digit, prepend `_`.
+
+| Raw (mfg / serial) | ROS 2 segment |
+|---|---|
+| `KION` | `KION` |
+| `S001` | `S001` |
+| `001` | `_001` |
+| `KION-001` | `KION_001` |
+| `agv.42` | `agv_42` |
+| `3M` | `_3M` |
+
+Example: an AGV with `manufacturer="KION"`, `serial_number="001"` is
+published at `/vda5050_master/KION/_001/order_status`, while its MQTT
+topic remains `uagv/v2/KION/001/order_status`. Distinct raw identities
+that sanitize to the same ROS 2 segment (e.g. `KION-001` and
+`KION_001`) are not detected at onboarding; deployments should choose
+serials that remain unambiguous after sanitization.
+
+Master logs a one-shot `INFO` message the first time each AGV's identity
+is sanitized, so the mapping is visible in startup logs.
+
 ### Global topics (4)
 
 | Topic | Direction | QoS | Purpose |
