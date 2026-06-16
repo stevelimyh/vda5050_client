@@ -20,13 +20,18 @@
 
 #include <unistd.h>
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
+#include "fmt/format.h"
 #include "vda5050_master_ros2/msg/master_connection.hpp"
 #include "vda5050_master_ros2/order_status_builder.hpp"
+#include "vda5050_master_ros2/pose_view_builder.hpp"
 
 namespace vda5050_master_ros2 {
 namespace {
@@ -51,8 +56,10 @@ std::string default_master_id()
 VDA5050MasterROS2::VDA5050MasterROS2(
   std::shared_ptr<vda5050_core::transport::MqttClientInterface> mqtt_client,
   rclcpp::Node::SharedPtr ros2_node, const std::string& topic_namespace,
-  const std::string& master_id, const std::string& master_version)
+  const std::string& master_id, const std::string& master_version,
+  double pose_view_rate_hz)
 : vda5050_core::master::VDA5050Master(std::move(mqtt_client)),
+  node_(ros2_node),
   device_status_(
     std::make_unique<DeviceStatusPublisher>(ros2_node, topic_namespace)),
   device_status_service_(std::make_unique<DeviceStatusService>(
@@ -70,6 +77,14 @@ VDA5050MasterROS2::VDA5050MasterROS2(
     },
     [this](const std::string& mfg, const std::string& serial) {
       return this->get_active_assignment_id(mfg, serial);
+    },
+    topic_namespace)),
+  pose_view_publisher_(
+    std::make_unique<PoseViewPublisher>(ros2_node, topic_namespace)),
+  get_pose_view_service_(std::make_unique<GetPoseViewService>(
+    ros2_node,
+    [this](const std::string& mfg, const std::string& serial) {
+      return this->get_agv(mfg, serial);
     },
     topic_namespace)),
   order_send_service_(std::make_unique<OrderSendService>(
@@ -181,6 +196,36 @@ VDA5050MasterROS2::VDA5050MasterROS2(
     },
     topic_namespace))
 {
+  if (pose_view_rate_hz <= 0.0 || pose_view_rate_hz > kMaxPoseViewRateHz)
+  {
+    throw std::invalid_argument(fmt::format(
+      "pose_view_rate_hz must be in (0, {}] Hz", kMaxPoseViewRateHz));
+  }
+
+  const auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    std::chrono::duration<double>(1.0 / pose_view_rate_hz));
+  pose_view_timer_ =
+    node_->create_wall_timer(period, [this]() { this->publish_pose_views(); });
+}
+
+VDA5050MasterROS2::~VDA5050MasterROS2()
+{
+  // Stop the periodic callback before the members it touches are torn down.
+  // The caller is expected to have stopped spinning the executor first.
+  if (pose_view_timer_) pose_view_timer_->cancel();
+}
+
+void VDA5050MasterROS2::publish_pose_views()
+{
+  for (const auto& [mfg, serial] : get_onboarded_agvs())
+  {
+    auto agv = get_agv(mfg, serial);
+    if (!agv) continue;
+    const vda5050_core::master::PoseView view = agv->get_pose_view();
+    if (view.source == vda5050_core::master::PoseSource::None) continue;
+    pose_view_publisher_->publish_pose_view(
+      mfg, serial, build_pose_view_msg(view, mfg, serial));
+  }
 }
 
 std::pair<std::string, std::string> VDA5050MasterROS2::split_agv_id(

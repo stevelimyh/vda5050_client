@@ -34,6 +34,7 @@
 #include "vda5050_master_ros2/fleet_roster_subscriber.hpp"
 #include "vda5050_master_ros2/get_loaded_map_service.hpp"
 #include "vda5050_master_ros2/get_master_broker_status_service.hpp"
+#include "vda5050_master_ros2/get_pose_view_service.hpp"
 #include "vda5050_master_ros2/instant_actions_send_service.hpp"
 #include "vda5050_master_ros2/master_connection_publisher.hpp"
 #include "vda5050_master_ros2/offboard_agv_batch_service.hpp"
@@ -43,6 +44,7 @@
 #include "vda5050_master_ros2/order_send_service.hpp"
 #include "vda5050_master_ros2/order_status_publisher.hpp"
 #include "vda5050_master_ros2/order_status_service.hpp"
+#include "vda5050_master_ros2/pose_view_publisher.hpp"
 #include "vda5050_master_ros2/resume_mode_cancelled_queue_service.hpp"
 
 namespace vda5050_master_ros2 {
@@ -101,6 +103,11 @@ namespace vda5050_master_ros2 {
 class VDA5050MasterROS2 : public vda5050_core::master::VDA5050Master
 {
 public:
+  /// Default pose_view publish rate (Hz) when not otherwise configured.
+  static constexpr double kDefaultPoseViewRateHz = 1.0;
+  /// Upper bound on the configurable pose_view rate (Hz); rejected above.
+  static constexpr double kMaxPoseViewRateHz = 1000.0;
+
   /// \brief Construct.
   /// \param mqtt_client      Same MQTT client passed to base; required.
   /// \param ros2_node        ROS 2 node hosting publishers.
@@ -112,15 +119,19 @@ public:
   ///                         so multi-master deployments get distinct
   ///                         IDs without configuration.
   /// \param master_version   Software version string on MasterConnection.
+  /// \param pose_view_rate_hz Fixed publish rate (Hz) for the per-AGV
+  ///                          pose_view stream. Must be in
+  ///                          (0, kMaxPoseViewRateHz]; out-of-range throws.
   VDA5050MasterROS2(
     std::shared_ptr<vda5050_core::transport::MqttClientInterface> mqtt_client,
     rclcpp::Node::SharedPtr ros2_node,
     const std::string& topic_namespace =
       DeviceStatusPublisher::kDefaultNamespace,
     const std::string& master_id = "",
-    const std::string& master_version = "vda5050_master_ros2");
+    const std::string& master_version = "vda5050_master_ros2",
+    double pose_view_rate_hz = kDefaultPoseViewRateHz);
 
-  ~VDA5050MasterROS2() override = default;
+  ~VDA5050MasterROS2() override;
 
   VDA5050MasterROS2(const VDA5050MasterROS2&) = delete;
   VDA5050MasterROS2& operator=(const VDA5050MasterROS2&) = delete;
@@ -149,6 +160,18 @@ public:
   OrderStatusService& order_status_service()
   {
     return *order_status_service_;
+  }
+
+  /// Read access to the PoseView publisher (test + diagnostics).
+  PoseViewPublisher& pose_view_publisher()
+  {
+    return *pose_view_publisher_;
+  }
+
+  /// Read access to the GetPoseView service (test + diagnostics).
+  GetPoseViewService& get_pose_view_service()
+  {
+    return *get_pose_view_service_;
   }
 
   /// Read access to the AssignOrder service (test + diagnostics).
@@ -258,10 +281,16 @@ private:
   static std::pair<std::string, std::string> split_agv_id(
     const std::string& agv_id);
 
+  // Timer callback: publish a fused PoseView for every onboarded AGV.
+  void publish_pose_views();
+
+  rclcpp::Node::SharedPtr node_;
   std::unique_ptr<DeviceStatusPublisher> device_status_;
   std::unique_ptr<DeviceStatusService> device_status_service_;
   std::unique_ptr<OrderStatusPublisher> order_status_publisher_;
   std::unique_ptr<OrderStatusService> order_status_service_;
+  std::unique_ptr<PoseViewPublisher> pose_view_publisher_;
+  std::unique_ptr<GetPoseViewService> get_pose_view_service_;
   std::unique_ptr<OrderSendService> order_send_service_;
   std::unique_ptr<InstantActionsSendService> instant_actions_send_service_;
   std::unique_ptr<OnboardAGVService> onboard_agv_service_;
@@ -285,6 +314,10 @@ private:
   std::string master_id_;
   std::unique_ptr<MasterConnectionPublisher> master_connection_publisher_;
   std::unique_ptr<FleetRosterSubscriber> fleet_roster_subscriber_;
+
+  // Declared last so it is destroyed first — the timer callback touches the
+  // pose_view publisher and the base AGV registry, which must outlive it.
+  rclcpp::TimerBase::SharedPtr pose_view_timer_;
 };
 
 }  // namespace vda5050_master_ros2

@@ -316,6 +316,21 @@ int main(int argc, char** argv)
     }
   }
 
+  double pose_view_rate_hz = 1.0;
+  {
+    const std::string rate_str = env_or("VDA5050_POSE_VIEW_RATE_HZ", "1.0");
+    try
+    {
+      pose_view_rate_hz = std::stod(rate_str);
+    }
+    catch (const std::exception&)
+    {
+      VDA5050_WARN(
+        "Invalid VDA5050_POSE_VIEW_RATE_HZ='{}'; using 1.0 Hz", rate_str);
+      pose_view_rate_hz = 1.0;
+    }
+  }
+
   VDA5050_INFO("ExampleMaster starting:");
   VDA5050_INFO("  Broker:    {}", broker);
   VDA5050_INFO("  Namespace: {}", ns);
@@ -323,6 +338,7 @@ int main(int argc, char** argv)
     "  vda5050_core::master::Map path:  {}",
     map_path.empty() ? "(none — pre-send map check will reject orders)"
                      : map_path);
+  VDA5050_INFO("  PoseView:  {} Hz", pose_view_rate_hz);
 
   // Per-PID client_id avoids broker-side session-takeover races when
   // master is restarted within Paho's keepalive window (~60s). With a
@@ -331,7 +347,8 @@ int main(int argc, char** argv)
   auto mqtt = vda5050_core::transport::create_default_client_shared(
     broker, fmt::format("example_master-{}", ::getpid()));
   auto node = std::make_shared<rclcpp::Node>("example_master");
-  auto master = std::make_shared<ExampleMaster>(mqtt, node, ns);
+  auto master = std::make_shared<ExampleMaster>(
+    mqtt, node, ns, "", "vda5050_master_ros2", pose_view_rate_hz);
 
   if (!map_path.empty())
   {

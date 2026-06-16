@@ -308,6 +308,7 @@ if(BUILD_TESTING)
     test/master/test_unit_agv_operational_state.cpp
     test/master/test_unit_agv_lifecycle.cpp
     test/master/test_unit_agv_order_lifecycle.cpp
+    test/master/test_unit_agv_pose_view.cpp
   )
   target_link_libraries(test_master_agv vda5050_core::master)
 

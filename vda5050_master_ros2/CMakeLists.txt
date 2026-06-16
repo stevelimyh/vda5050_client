@@ -33,6 +33,7 @@ set(msg_files
   msg/FleetRoster.msg
   msg/MasterConnection.msg
   msg/OrderStatus.msg
+  msg/PoseView.msg
 )
 set(srv_files
   srv/AssignInstantActions.srv
@@ -42,6 +43,7 @@ set(srv_files
   srv/GetLoadedMap.srv
   srv/GetMasterBrokerStatus.srv
   srv/GetOrderStatus.srv
+  srv/GetPoseView.srv
   srv/OffboardAGV.srv
   srv/OffboardAGVBatch.srv
   srv/OnboardAGV.srv
@@ -182,6 +184,7 @@ if(BUILD_TESTING)
   _add_ros2_test(test_device_status_service      test/unit/test_unit_device_status_service.cpp)
   _add_ros2_test(test_order_status_publisher     test/unit/test_unit_order_status_publisher.cpp)
   _add_ros2_test(test_order_status_service       test/unit/test_unit_order_status_service.cpp)
+  _add_ros2_test(test_pose_view_publisher        test/unit/test_unit_pose_view_publisher.cpp)
   _add_ros2_test(test_order_send_service         test/unit/test_unit_order_send_service.cpp)
   _add_ros2_test(test_instant_actions_send_service test/unit/test_unit_instant_actions_send_service.cpp)
   _add_ros2_test(test_onboard_agv_service        test/unit/test_unit_onboard_agv_service.cpp)
@@ -212,6 +215,17 @@ if(BUILD_TESTING)
     ${vda5050_interfaces_TARGETS}
   )
   set_target_properties(test_order_status_builder PROPERTIES
+    BUILD_RPATH_USE_ORIGIN TRUE
+    INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+  # Pure function — no DDS env needed.
+  ament_add_gmock(test_pose_view_builder test/unit/test_unit_pose_view_builder.cpp)
+  target_link_libraries(test_pose_view_builder
+    ${PROJECT_NAME}_lib
+    rclcpp::rclcpp
+    ${vda5050_interfaces_TARGETS}
+  )
+  set_target_properties(test_pose_view_builder PROPERTIES
     BUILD_RPATH_USE_ORIGIN TRUE
     INSTALL_RPATH_USE_LINK_PATH TRUE)
 

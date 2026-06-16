@@ -18,6 +18,7 @@
 
 #include "vda5050_core/master/agv.hpp"
 
+#include <algorithm>
 #include <utility>
 
 #include "nlohmann/json.hpp"
@@ -53,6 +54,16 @@ const char* guard_failure_to_str(GuardFailure g)
     default:
       return "none";
   }
+}
+
+// Age of a cached sample at "now", floored at zero so a backward wall-clock
+// step never yields a negative duration.
+std::chrono::nanoseconds age_since(const AGV::TimePoint& tp)
+{
+  return std::max(
+    std::chrono::nanoseconds::zero(),
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+      AGV::Clock::now() - tp));
 }
 
 }  // namespace
@@ -845,6 +856,50 @@ AGV::OrderStatusBundle AGV::get_order_status_bundle() const
   return OrderStatusBundle{
     last_state_, last_state_time_, order_lifecycle_.snapshot(),
     order_lifecycle_.pending_update_count()};
+}
+
+PoseView AGV::get_pose_view() const
+{
+  std::lock_guard<std::mutex> lock(data_mutex_);
+
+  PoseView view;
+
+  // Visualization carries no driving flag; relay it from State.
+  if (last_state_) view.driving = last_state_->driving;
+
+  // Latest-wins between State and Visualization by AGV header timestamp,
+  // considering only sources that actually carry a position. Both timestamps
+  // come from the same AGV clock, so they are directly comparable.
+  const bool state_has_pos = last_state_ && last_state_->agv_position;
+  const bool viz_has_pos =
+    last_visualization_ && last_visualization_->agv_position;
+
+  bool use_viz = viz_has_pos;
+  if (state_has_pos && viz_has_pos)
+  {
+    use_viz =
+      last_visualization_->header.timestamp >= last_state_->header.timestamp;
+  }
+
+  // Position and velocity always come from the same source (never mix a
+  // position from one with a velocity from the other). data_age uses the
+  // master receive time so it stays on a single clock.
+  if (use_viz)
+  {
+    view.source = PoseSource::Visualization;
+    view.agv_position = last_visualization_->agv_position;
+    view.velocity = last_visualization_->velocity;
+    view.data_age = age_since(*last_visualization_time_);
+  }
+  else if (state_has_pos)
+  {
+    view.source = PoseSource::State;
+    view.agv_position = last_state_->agv_position;
+    view.velocity = last_state_->velocity;
+    view.data_age = age_since(*last_state_time_);
+  }
+
+  return view;
 }
 
 // ============================================================================

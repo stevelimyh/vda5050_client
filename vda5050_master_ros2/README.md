@@ -20,7 +20,7 @@ surface (to FMS clients).
 Default `<ns>` = `vda5050_master`; override via the `VDA5050MasterROS2`
 ctor's `topic_namespace` argument for multi-master deployments.
 
-### Per-AGV topics (5)
+### Per-AGV topics (6)
 
 Created on first `Connection ONLINE` from the AGV. Continuous publish
 streams — async observers subscribe without polling.
@@ -32,6 +32,7 @@ streams — async observers subscribe without polling.
 | `/<ns>/<mfg>/<serial>/factsheet` | `vda5050_interfaces/Factsheet` | AGV capability declaration (typeSpec, physicalParameters, etc.) |
 | `/<ns>/<mfg>/<serial>/device_status` | `vda5050_master_ros2/DeviceStatus` | Combined snapshot — single-subscription convenience for consumers that want one topic instead of three |
 | `/<ns>/<mfg>/<serial>/order_status` | `vda5050_master_ros2/OrderStatus` | Master's lifecycle view: phase + last_node + base/horizon counts + action_states + errors |
+| `/<ns>/<mfg>/<serial>/pose_view` | `vda5050_master_ros2/PoseView` | Fused pose at a fixed rate (default 1 Hz, `VDA5050_POSE_VIEW_RATE_HZ`): driving + position + velocity, freshest of State / optional Visualization (latest-wins by AGV timestamp), with `source` + `data_age`. Not the VDA5050 `visualization` message. |
 
 #### ROS 2 topic-name sanitization for `<mfg>` and `<serial>`
 
@@ -76,7 +77,7 @@ is sanitized, so the mapping is visible in startup logs.
 | `/<ns>/fleet_roster` | external → master | **RELIABLE / TRANSIENT_LOCAL (latched)** | Declarative full-state roster. Master diffs against current onboarded set, calls `onboard_agv_batch` / `offboard_agv_batch` to converge |
 | `/<ns>/master_connection` | master → external | **RELIABLE / TRANSIENT_LOCAL (latched)** | Master liveness + readiness signal. State enum: `STARTING` → `READY` → `DEGRADED` → `READY` → `SHUTTING_DOWN`. 30 s heartbeat republish so subscribers can detect crashes by heartbeat-absence. Carries `master_id` (hostname-pid fallback), `master_version`, `broker_connected`, `onboarded_agv_count` |
 
-### Services (12)
+### Services (13)
 
 **Order dispatch**
 - `assign_order` — sync order dispatch. Handles both new orders and updates. Returns `AssignmentDecision` + diagnostic errors[]
@@ -91,6 +92,7 @@ is sanitized, so the mapping is visible in startup logs.
 **Synchronous queries (operator diagnostics)**
 - `get_device_status` — coherent (single-mutex) snapshot of state + connection + factsheet for one AGV
 - `get_order_status` — atomic State + lifecycle bundle
+- `get_pose_view` — fused pose snapshot for one AGV (same view as the `pose_view` stream)
 - `get_loaded_map` — currently-loaded topology map + per-AGV factsheet-alignment summary
 - `get_master_broker_status` — master's own MQTT-broker connection state + disconnect history
 

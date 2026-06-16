@@ -41,6 +41,7 @@
 #include "vda5050_core/master/order/order_lifecycle_manager.hpp"
 #include "vda5050_core/master/order/order_publisher.hpp"
 #include "vda5050_core/master/order/order_stitcher.hpp"
+#include "vda5050_core/master/pose_view.hpp"
 #include "vda5050_core/master/standard_names.hpp"
 #include "vda5050_core/types/error.hpp"
 
@@ -290,6 +291,17 @@ public:
    * @return OrderStatusBundle suitable for OrderStatus message construction.
    */
   OrderStatusBundle get_order_status_bundle() const;
+
+  /**
+   * @brief Fused pose snapshot for the pose_view stream.
+   *
+   * Picks the freshest of the cached State / Visualization (by AGV header
+   * timestamp) that carries an agv_position, takes velocity from that same
+   * source, and relays driving from State — all under one data_mutex_
+   * acquisition. data_age is measured against the master receive time.
+   * @return PoseView; source == None when no position has been received.
+   */
+  PoseView get_pose_view() const;
 
   // ============================================================================
   // Order Lifecycle (read-only forwarders to per-AGV OrderLifecycleManager)
