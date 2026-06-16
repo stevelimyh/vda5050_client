@@ -1,0 +1,47 @@
+# GetLoadedMap — return master's currently-loaded map metadata + per-AGV
+# alignment status. Operator diagnostics for "what's running."
+#
+# **Why this exists**: an FMS operator needs to answer "is the master
+# running with floor1 v1.0 or the staging map?" without grepping logs.
+# Pairs with VDA5050Master::load_map_from_config and the master's
+# factsheet_alignment validator (Task #39 sub-criterion #2).
+#
+# Request takes no fields — there is one active map at a time per
+# master in V0. Multi-map support is post-V0.
+---
+# Status enum.
+#
+# SUCCESS         — a map is loaded; metadata + alignment fields below
+#                   are populated.
+# NO_MAP_LOADED   — the master is running without a loaded map; metadata
+#                   fields are empty defaults; agv_alignments is empty.
+uint8 SUCCESS=0
+uint8 NO_MAP_LOADED=1
+uint8 status
+
+# Map metadata. Mirrors VDA5050 v2.0.0 §6.3.2 / §7.8 State.maps[] field
+# names so this can be echoed in State payloads later without a wrapper.
+# When status == NO_MAP_LOADED, all string fields are empty and counts
+# are zero.
+string map_id
+string map_version
+string map_status        # "ENABLED" / "DISABLED"
+string map_descriptor
+
+# Wall-clock time at which the master finished loading the map.
+# Expressed as `Time[<=1]` (length 0 or 1): empty when status ==
+# NO_MAP_LOADED; single element when a map is loaded. Callers check
+# via `.empty()` and access via `[0]` when present.
+builtin_interfaces/Time[<=1] loaded_at
+
+# Topology counts (post-parse).
+uint32 node_count
+uint32 edge_count
+
+# Path the map was loaded from. Empty if the map was set in-memory
+# (e.g. via tests or a future ROS-distributed workflow).
+string source_path
+
+# Per-AGV alignment summary. One entry per currently-onboarded AGV.
+# Empty when status == NO_MAP_LOADED or no AGVs are onboarded.
+AgvAlignment[] agv_alignments

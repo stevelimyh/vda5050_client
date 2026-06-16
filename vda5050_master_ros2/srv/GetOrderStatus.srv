@@ -1,0 +1,45 @@
+# GetOrderStatus — query the master's cached order-status snapshot for
+# one AGV. Companion to the OrderStatusPublisher topic stream.
+#
+# The master maintains a per-AGV cache of the latest State message and
+# its OrderLifecycleManager view of the active order. This service
+# returns an atomic snapshot of both, without forcing a fresh fetch
+# from the AGV. For continuous monitoring, subscribe to the
+# /<namespace>/<manufacturer>/<serial_number>/order_status topic
+# instead.
+
+string manufacturer
+string serial_number
+---
+# Status enum mirrors GetDeviceStatus for FMS-client uniformity.
+#
+# SUCCESS: order_status field is populated with the latest snapshot.
+#   phase=PHASE_NO_ORDER conveys "AGV onboarded but master not tracking
+#   an order" — that's a valid SUCCESS, not a service-delivery error.
+# INVALID_REQUEST: manufacturer or serial_number is empty.
+# AGV_NOT_ONBOARDED: no AGV with that {manufacturer, serial_number} is
+#   in the master's onboarded list.
+# AGV_SILENT: the AGV is onboarded but the master has never received a
+#   State message AND there is no active order — nothing meaningful to
+#   report yet.
+uint8 SUCCESS=0
+uint8 INVALID_REQUEST=1
+uint8 AGV_NOT_ONBOARDED=2
+uint8 AGV_SILENT=3
+uint8 status
+
+# Echo of request — async-fanout correlation.
+string manufacturer
+string serial_number
+
+# Order-status payload. Always populated when status == SUCCESS;
+# zero-initialised otherwise. phase=PHASE_NO_ORDER is the canonical
+# "AGV is onboarded and reachable but no active order" response.
+OrderStatus order_status
+
+# Wall-clock time at which the master most recently received the
+# underlying State message from this AGV. Expressed as `Time[<=1]`
+# (length 0 or 1): empty when status is not SUCCESS or no State has
+# been received; single element otherwise. Callers check via
+# `.empty()` and access via `[0]` when present.
+builtin_interfaces/Time[<=1] state_received_at

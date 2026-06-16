@@ -1,0 +1,95 @@
+# AssignInstantActions — request the master to dispatch a VDA5050
+# InstantActions message to one AGV, gated by the synchronous
+# instant-action validator chain (action conflict detection §6.12,
+# operating-mode gate §6.10.6 with §6.8.1 allowlist exemption,
+# duplicate action_id detection §6.6.2). Wraps
+# VDA5050Master::assign_instant_actions. Service half of Task #61.
+#
+# This is the GENERIC entry point for ALL instant actions — predefined
+# (cancelOrder, startPause, stopPause, stateRequest, factsheetRequest,
+# logReport, initPosition, startCharging, stopCharging) and custom
+# (any actionType the AGV factsheet declares). FMS clients build the
+# desired Action(s) into an InstantActions message and send via this
+# service; the master routes them via MQTT to the AGV's instantActions
+# topic at QoS 0 (§6.9).
+#
+# Compared to AssignOrder:
+#   - InstantActions are NOT subject to graph / traversability /
+#     stitching validation. They go through schema (#23) + PreSend
+#     (#16) + action conflict detection (#22) + the §6.10.6 mode gate.
+#   - The C++ entry point is `master.assign_instant_actions(...)` —
+#     parallel to `master.assign_order(...)` from #15.
+#
+# **`ASSIGNED` semantics**: pre-flight passed; the InstantActions
+# message has been queued for publish on the master's queue-processor
+# thread. NOT AGV-acknowledged. Per §6.6.2, the AGV will report
+# action_state.action_status transitions (WAITING → INITIALIZING →
+# RUNNING → FINISHED / FAILED) on its State topic — FMS observes
+# action progress via the OrderStatus topic's `action_states[]` field.
+#
+# **Idempotency**: each Action carries a unique `action_id` (UUID
+# recommended, §6.6.2). Re-sending the same `action_id` is rejected
+# as DUPLICATE_ACTION_ID. FMS owns action_id uniqueness.
+#
+# **Cancellation**: an in-flight instant action is cancelled by
+# sending a `cancelOrder` instant action (which cancels the active
+# order AND its associated action_states). There is no per-action
+# cancel.
+
+# Required: AGV identity. Empty values are rejected as INVALID_REQUEST.
+string manufacturer
+string serial_number
+
+# The instant actions to dispatch. May contain 1+ actions. Each
+# action.action_id must be globally unique (UUID recommended); the
+# master rejects DUPLICATE_ACTION_ID against the active order's
+# action_ids and against in-flight action_states[].
+vda5050_interfaces/InstantActions instant_actions
+---
+# Decision enum — values 0–7 mirror C++ InstantActionDecision
+# (instant_action_assignment_result.hpp) one-to-one. Value 8
+# (INVALID_REQUEST) is service-only: empty manufacturer or
+# serial_number, rejected before reaching the C++ entry point.
+# Sequential — future codes appended.
+#
+# ASSIGNED                       — pre-flight passed; actions queued for publish
+#                                  (NOT AGV-acknowledged — see header).
+# AGV_NOT_ONBOARDED              — no AGV with this {manufacturer, serial_number}.
+# AGV_OFFLINE                    — connection_state != ONLINE; QoS 0 send to
+#                                  offline AGV is silently dropped, so we reject.
+# DUPLICATE_ACTION_ID            — one or more candidate action_ids collide
+#                                  within the batch, with active in-flight
+#                                  actions, or with the active order.
+#                                  Empty action_id also rejected here.
+# AGV_QUEUE_FULL                 — AGV's outbound queue is full; FMS dispatching
+#                                  faster than AGV processes.
+# HARD_ACTION_BLOCKED            — HARD-blocking candidate while AGV has at
+#                                  least one in-flight action (§6.12).
+# ACTION_BLOCKED_BY_DRIVING      — SOFT- or HARD-blocking candidate while AGV
+#                                  is driving (§6.12).
+# AGV_MODE_NOT_AUTO_FOR_ACTION   — AGV not in AUTOMATIC/SEMIAUTOMATIC AND the
+#                                  candidate action_type is not on the §6.8.1
+#                                  instant-scope allowlist.
+# INVALID_REQUEST                — service-level: empty manufacturer or
+#                                  serial_number in the request.
+uint8 ASSIGNED=0
+uint8 AGV_NOT_ONBOARDED=1
+uint8 AGV_OFFLINE=2
+uint8 DUPLICATE_ACTION_ID=3
+uint8 AGV_QUEUE_FULL=4
+uint8 HARD_ACTION_BLOCKED=5
+uint8 ACTION_BLOCKED_BY_DRIVING=6
+uint8 AGV_MODE_NOT_AUTO_FOR_ACTION=7
+uint8 INVALID_REQUEST=8
+uint8 decision
+
+# Echo of {manufacturer, serial_number} for FMS-side correlation when
+# fanning out N async calls. action_ids are inside the request's
+# instant_actions msg — FMS already has them.
+string manufacturer
+string serial_number
+
+# Diagnostic errors populated for non-ASSIGNED decisions. Empty on
+# success. Same content as InstantActionAssignmentResult.errors,
+# converted via the existing to_msg<> template.
+vda5050_interfaces/Error[] errors

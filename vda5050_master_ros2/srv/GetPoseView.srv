@@ -1,0 +1,30 @@
+# GetPoseView — query the master's fused pose snapshot for one AGV.
+# Companion to the PoseViewPublisher topic stream. Returns the same fused
+# view the 1 Hz stream publishes, without forcing a fresh fetch from the AGV.
+# For continuous monitoring, subscribe to the
+# /<namespace>/<manufacturer>/<serial_number>/pose_view topic instead.
+
+string manufacturer
+string serial_number
+---
+# Status enum mirrors GetOrderStatus for FMS-client uniformity.
+#
+# SUCCESS: pose_view is populated with the latest fused snapshot.
+# INVALID_REQUEST: manufacturer or serial_number is empty.
+# AGV_NOT_ONBOARDED: no AGV with that {manufacturer, serial_number} is in
+#   the master's onboarded list.
+# AGV_SILENT: the AGV is onboarded but no position has been received yet
+#   (pose_view.source would be SOURCE_NONE) — nothing meaningful to report.
+uint8 SUCCESS=0
+uint8 INVALID_REQUEST=1
+uint8 AGV_NOT_ONBOARDED=2
+uint8 AGV_SILENT=3
+uint8 status
+
+# Echo of request — async-fanout correlation.
+string manufacturer
+string serial_number
+
+# Fused pose payload. Populated when status == SUCCESS; zero-initialised
+# otherwise.
+PoseView pose_view

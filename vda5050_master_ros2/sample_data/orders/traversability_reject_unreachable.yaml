@@ -1,0 +1,48 @@
+# Validator demo: traversabilityValidationError — first node unreachable.
+# First node (N0) is placed at (100, 100) — far outside the AGV's
+# allowed_deviation_x_y from its current pose (0, 0). Traversability
+# validator rejects: the AGV cannot trivially reach N0 (spec §6.6.1.3 #4).
+# The order NEVER reaches MQTT.
+#
+# Expected:
+#   - Sync response: decision=0 (ASSIGNED) — pre-flight passed
+#   - T2 master log:
+#     [ERROR] Order validation failed for Manufacturer/S001
+#     [ERROR]   - type=traversabilityValidationError level=WARNING
+#               desc=AGV is not within the first node's allowed_deviation_x_y
+#                    (distance=141.42 m, allowed=0.50 m)
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+order:
+  header:
+    header_id: 0
+    timestamp: 0
+    version: '2.0.0'
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  order_id: 'sample-traversability-unreachable'
+  order_update_id: 0
+  zone_set_id: []
+  nodes:
+    - {node_id: 'N0', sequence_id: 0, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 100.0, y: 100.0, theta: [0.0],   # ← unreachable
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+    - {node_id: 'N1', sequence_id: 2, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 105.0, y: 100.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+  edges:
+    - {edge_id: 'E1', sequence_id: 1, start_node_id: 'N0', end_node_id: 'N1',
+       released: true, actions: [], edge_description: [],
+       max_speed: [1.0], length: [5.0],
+       max_height: [], min_height: [],
+       orientation: [], orientation_type: [],
+       direction: [], rotation_allowed: [], max_rotation_speed: [],
+       trajectory: []}

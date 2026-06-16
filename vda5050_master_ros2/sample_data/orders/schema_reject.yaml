@@ -1,0 +1,44 @@
+# Validator demo: schemaValidationError.
+# Identical to happy_path.yaml EXCEPT header.version='99.0' — not in
+# SupportedSchemaVersions. Master accepts the AssignOrder service call,
+# returns decision != 0 with a schemaValidationError in `errors[]`, and
+# the order NEVER reaches MQTT.
+#
+# Expected response: decision=7 (STITCH_REJECTED or similar) plus
+#   error_type='schemaValidationError'
+#   error_description="header.version '99.0' is not in SupportedSchemaVersions"
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+order:
+  header:
+    header_id: 0
+    timestamp: 0
+    version: '99.0'                            # ← bad version
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  order_id: 'sample-schema-reject'
+  order_update_id: 0
+  zone_set_id: []
+  nodes:
+    - {node_id: 'N0', sequence_id: 0, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 0.0, y: 0.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+    - {node_id: 'N1', sequence_id: 2, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 5.0, y: 0.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+  edges:
+    - {edge_id: 'E1', sequence_id: 1, start_node_id: 'N0', end_node_id: 'N1',
+       released: true, actions: [], edge_description: [],
+       max_speed: [1.0], length: [5.0],
+       max_height: [], min_height: [],
+       orientation: [], orientation_type: [],
+       direction: [], rotation_allowed: [], max_rotation_speed: [],
+       trajectory: []}

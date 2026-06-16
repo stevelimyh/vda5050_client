@@ -1,0 +1,40 @@
+# OnboardAGV — register a single AGV with the master so MQTT messages from
+# this AGV are routed to handlers. Wraps VDA5050Master::onboard_agv.
+#
+# Single-AGV variant. For onboarding multiple AGVs in one call (e.g. from a
+# FleetRoster snapshot), use OnboardAGVBatch.srv — the batch sibling.
+#
+# Request reuses AGVOnboardSpec: same field set is carried inside
+# FleetRoster.msg (DM → master fleet snapshot) and inside OnboardAGVBatch.srv
+# batch requests, so a caller can build one entry and dispatch it through
+# any of the three surfaces.
+#
+# **Idempotency**: re-onboarding the same {manufacturer, serial_number}
+# returns ALREADY_ONBOARDED without disturbing the existing AGV instance.
+# FMS clients can call this safely on every startup or on AGV-pool
+# addition.
+#
+# **What onboarding does master-side**:
+#   - Creates an AGV instance with a per-AGV ProtocolAdapter.
+#   - Subscribes to the AGV's MQTT topics (state, connection, factsheet,
+#     visualization).
+#   - Adds the AGV to the master's onboarded list (visible to other services
+#     like AssignOrder, GetDeviceStatus, etc.).
+
+AGVOnboardSpec agv
+---
+# Status enum.
+#
+# SUCCESS              — AGV successfully onboarded.
+# ALREADY_ONBOARDED    — an AGV with this {manufacturer, serial_number}
+#                        is already in the master's onboard list.
+#                        Idempotent no-op; treat as success.
+# INVALID_REQUEST      — empty manufacturer or serial_number.
+uint8 SUCCESS=0
+uint8 ALREADY_ONBOARDED=1
+uint8 INVALID_REQUEST=2
+uint8 status
+
+# Echo of request — async-fanout correlation.
+string manufacturer
+string serial_number

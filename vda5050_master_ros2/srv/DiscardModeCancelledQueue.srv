@@ -1,0 +1,32 @@
+# DiscardModeCancelledQueue — drop the AGV's mode-cancelled buffer
+# without re-enqueue. Service half of Task #24.
+#
+# **When to call**: when FMS knows the captured orders are stale
+# (e.g. operator manually drove the AGV elsewhere during MANUAL
+# mode, so the original orders' first nodes are no longer
+# reachable). Counterpart to ResumeModeCancelledQueue.
+#
+# Calling on an empty buffer is a no-op SUCCESS.
+
+string manufacturer
+string serial_number
+---
+# Status enum.
+#
+# SUCCESS              — buffer cleared (counts may be zero if
+#                        already empty).
+# AGV_NOT_ONBOARDED    — no AGV with this {manufacturer,
+#                        serial_number} is currently in the master's
+#                        onboard list.
+# INVALID_REQUEST      — empty manufacturer or serial_number.
+uint8 SUCCESS=0
+uint8 AGV_NOT_ONBOARDED=1
+uint8 INVALID_REQUEST=2
+uint8 status
+
+string manufacturer
+string serial_number
+
+# Counts of items that were in the buffer at discard time.
+uint32 orders_discarded
+uint32 actions_discarded

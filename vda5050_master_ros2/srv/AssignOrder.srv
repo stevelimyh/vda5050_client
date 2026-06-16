@@ -1,0 +1,106 @@
+# AssignOrder — request the master to dispatch a VDA5050 Order to one
+# AGV, gated by the synchronous pre-flight chain (onboarded + ONLINE +
+# AVAILABLE + AUTOMATIC + position_initialized + stitcher pre-flight).
+# Wraps VDA5050Master::assign_order. Service half of Task #45 / #46.
+#
+# This single service handles BOTH new orders (Task #45) and order
+# updates (Task #46). The distinction is encoded inside `order` itself,
+# matching VDA5050 v2.0.0 §6.6.2 spec semantics:
+#   - new order: order.order_id is not the AGV's active order_id, OR
+#                order.order_update_id == 0 with a new order_id.
+#   - update:    order.order_id == active.order_id AND
+#                order.order_update_id > active.order_update_id.
+# The master dispatches based on these fields; FMS owns order_id
+# uniqueness across new orders.
+#
+# **`ASSIGNED` semantics**: a `decision == ASSIGNED` response means the
+# order has passed synchronous pre-flight and been queued for publish
+# on the master's queue-processor thread. It does NOT mean the AGV has
+# acknowledged the order yet. To observe AGV acceptance, subscribe to
+# the OrderStatus topic (/<ns>/<mfg>/<serial>/order_status) and wait
+# for order_id == request.order.order_id AND
+# order_update_id == request.order.order_update_id AND phase reaches
+# ACCEPTED or RUNNING.
+#
+# **Async validator failures**: schema / graph / traversability /
+# PreSend validators run on the queue-processor thread AFTER this
+# response returns. Their failures are NOT surfaced through this
+# service in V0 (see Task #57 for the planned AssignmentEvents topic).
+# FMS clients should monitor the OrderStatus topic for phase=FAILED or
+# the order_id field not transitioning to the dispatched value.
+#
+# **Idempotency**: re-sending the same (order_id, order_update_id) is
+# the FMS's responsibility. The master does NOT dedupe in V0 (see
+# Task #58). A re-send may either (a) return STITCH_REJECTED if
+# order_update_id <= active, or (b) be processed again as a fresh
+# dispatch.
+#
+# **Cancellation**: to cancel a dispatched order, FMS uses the
+# instant-actions path (cancelOrder) — NOT this service. Post-V0
+# Task #55 will expose a dedicated CancelOrder.srv.
+#
+# **Concurrency**: under rclcpp's default single-threaded executor,
+# concurrent AssignOrder calls to the same AGV are serialised — the
+# second call's pre-flight observes the first's effect. Multi-threaded
+# executor users should add their own (mfg, serial) lock.
+
+# Required: AGV identity. Carried out-of-band even though the order's
+# header carries manufacturer/serial — those identify the FMS, while
+# these identify the routing target. Empty values are rejected as
+# INVALID_REQUEST.
+string manufacturer
+string serial_number
+
+# The order to dispatch. order_update_id semantics select new vs.
+# update path (see header comment).
+vda5050_interfaces/Order order
+---
+# Decision enum — values 0..8 mirror C++ AssignmentDecision
+# (assignment_result.hpp) one-to-one. Value 9 (INVALID_REQUEST) is
+# service-only: empty manufacturer or serial_number, rejected before
+# reaching the C++ entry point. Sequential — future codes appended.
+#
+# ASSIGNED                     — pre-flight passed; order queued for publish
+#                                (NOT AGV-acknowledged — see header).
+# AGV_NOT_ONBOARDED            — no AGV with this {manufacturer, serial_number}.
+# AGV_OFFLINE                  — connection_state != ONLINE.
+# AGV_NOT_READY                — operational_state ERROR/UNAVAILABLE/UNKNOWN.
+# AGV_MODE_NOT_AUTO            — operating_mode != AUTOMATIC (V0: strict AUTOMATIC).
+# AGV_POSITION_NOT_INITIALIZED — AGV reports position not initialised.
+# AGV_NO_STATE_YET             — AGV onboarded but has not reported any State.
+# STITCH_REJECTED              — stitcher rejected the update. Disambiguate
+#                                via errors[].error_type — stable strings:
+#                                  "stitchPointPassed", "stitchNodeMismatch",
+#                                  "orderUpdateIdTooLow", "orderIdMismatch".
+# STITCH_QUEUED                — stitcher accepted but order is queued
+#                                awaiting AGV to reach the stitch point.
+# INVALID_REQUEST              — service-level: empty manufacturer or
+#                                serial_number in the request.
+uint8 ASSIGNED=0
+uint8 AGV_NOT_ONBOARDED=1
+uint8 AGV_OFFLINE=2
+uint8 AGV_NOT_READY=3
+uint8 AGV_MODE_NOT_AUTO=4
+uint8 AGV_POSITION_NOT_INITIALIZED=5
+uint8 AGV_NO_STATE_YET=6
+uint8 STITCH_REJECTED=7
+uint8 STITCH_QUEUED=8
+uint8 INVALID_REQUEST=9
+uint8 decision
+
+# Echo of {manufacturer, serial_number, order_id, order_update_id} —
+# FMS clients that fan out N async calls correlate replies by these.
+# order_id / order_update_id are echoed from the request order
+# pre-conversion, so even malformed orders that fail conversion still
+# round-trip the identity.
+string manufacturer
+string serial_number
+string order_id
+uint32 order_update_id
+
+# Diagnostic errors populated for non-ASSIGNED, non-STITCH_QUEUED
+# decisions. Empty on success / queued. Same content as the
+# AssignmentResult.errors vector returned by the C++ entry point,
+# converted via the existing to_msg<> template. The error_type field
+# carries stable strings — see STITCH_REJECTED enum comment above.
+vda5050_interfaces/Error[] errors

@@ -1,0 +1,52 @@
+# Stitch demo — base order: N0 (released) → N1 (released) → N2 (horizon).
+# AGV walks to N1 and parks there. N2 is preview-only (not released).
+# Send stitch_update.yaml (same order_id, order_update_id=1) to release N2.
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+order:
+  header:
+    header_id: 0
+    timestamp: 0
+    version: '2.0.0'
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  order_id: 'sample-stitch'
+  order_update_id: 0
+  zone_set_id: []
+  nodes:
+    - {node_id: 'N0', sequence_id: 0, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 0.0, y: 0.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+    - {node_id: 'N1', sequence_id: 2, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 5.0, y: 0.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+    - {node_id: 'N2', sequence_id: 4, released: false, actions: [],
+       node_description: [],
+       node_position: [{x: 5.0, y: 5.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+  edges:
+    - {edge_id: 'E1', sequence_id: 1, start_node_id: 'N0', end_node_id: 'N1',
+       released: true, actions: [], edge_description: [],
+       max_speed: [1.0], length: [5.0],
+       max_height: [], min_height: [],
+       orientation: [], orientation_type: [],
+       direction: [], rotation_allowed: [], max_rotation_speed: [],
+       trajectory: []}
+    - {edge_id: 'E2', sequence_id: 3, start_node_id: 'N1', end_node_id: 'N2',
+       released: false, actions: [], edge_description: [],
+       max_speed: [1.0], length: [5.0],
+       max_height: [], min_height: [],
+       orientation: [], orientation_type: [],
+       direction: [], rotation_allowed: [], max_rotation_speed: [],
+       trajectory: []}

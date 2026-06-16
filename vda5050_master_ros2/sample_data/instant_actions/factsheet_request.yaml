@@ -1,0 +1,20 @@
+# factsheetRequest — predefined VDA5050 instant action requesting an
+# immediate Factsheet publish from the AGV. Allowlisted across all
+# operating modes (per spec §6.8.2.8).
+#
+# Expected response: decision=0 (ASSIGNED). AGV acks within 1 tick.
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+instant_actions:
+  header:
+    header_id: 0
+    timestamp: 0
+    version: '2.0.0'
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  actions:
+    - {action_id: 'sample-factsheet-req-1',
+       action_type: 'factsheetRequest',
+       blocking_type: 'NONE',
+       action_description: [],
+       action_parameters: []}

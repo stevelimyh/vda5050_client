@@ -1,0 +1,22 @@
+# OnboardAGVs — register multiple AGVs with the master in one call.
+# Batch sibling of OnboardAGV.srv. Wraps VDA5050Master::onboard_agv_batch.
+#
+# **Partial success**: each entry is processed independently. If 1 of N
+# fails the other N-1 are still onboarded. The response echoes which
+# entries newly onboarded and which were rejected.
+#
+# **Idempotent per entry**: re-onboarding an already-onboarded
+# {manufacturer, serial_number} is a no-op and is omitted from both
+# `onboarded` and `failed`. The caller can derive the skipped subset:
+#   skipped = request.agvs - onboarded - failed
+#
+# **When to use**: fleet bring-up from a roster, DM-driven reconciliation,
+# or any client with >1 AGV to register at once. For one-shot operator
+# calls use OnboardAGV.srv (single).
+
+AGVOnboardSpec[] agvs
+---
+# Action-effect lists. Already-onboarded entries are not echoed — they
+# did not change state.
+AGVOnboardSpec[] onboarded
+AGVOnboardSpec[] failed

@@ -1,0 +1,46 @@
+# ResumeModeCancelledQueue — re-enqueue every captured order +
+# instant-action from the AGV's mode-cancelled buffer at the FRONT
+# of the live queue (preserves original FMS-intended ordering).
+# Service half of Task #24.
+#
+# **When to call**: typically on the AUTOMATIC return edge of
+# `on_mode_changed` (or its equivalent for non-C++ FMS). The
+# buffer is populated by the library at every AUTOMATIC →
+# non-AUTOMATIC mode transition.
+#
+# **Ordering**: buffered items go to the FRONT of the live queue.
+# Example — buffer captured (orderA, orderB) at leave-AUTOMATIC;
+# during AUTOMATIC return, FMS sent orderC; FMS calls resume →
+# live queue becomes (orderA, orderB, orderC); AGV processes them
+# in that order.
+#
+# **Validator chain**: re-enqueued items still go through the full
+# pre-send / graph / traversability chain at publish time. If an
+# AGV moved during MANUAL and the order's first node is no longer
+# reachable, that order alone is rejected; the rest still flow.
+
+string manufacturer
+string serial_number
+---
+# Status enum.
+#
+# SUCCESS              — at least one item was re-enqueued (or
+#                        buffer was empty AND empty buffer is OK).
+# AGV_NOT_ONBOARDED    — no AGV with this {manufacturer,
+#                        serial_number} is currently in the master's
+#                        onboard list.
+# INVALID_REQUEST      — empty manufacturer or serial_number.
+uint8 SUCCESS=0
+uint8 AGV_NOT_ONBOARDED=1
+uint8 INVALID_REQUEST=2
+uint8 status
+
+# Echo of request — async-fanout correlation.
+string manufacturer
+string serial_number
+
+# Counts of items moved from buffer to the live queue. Both zero is
+# valid SUCCESS — buffer was empty (e.g. AGV was never in
+# AUTOMATIC, or FMS already called resume / discard).
+uint32 orders_resumed
+uint32 actions_resumed

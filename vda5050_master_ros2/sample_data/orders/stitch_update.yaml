@@ -1,0 +1,44 @@
+# Stitch demo — UPDATE: same order_id as stitch_base.yaml, update_id=1.
+# Per VDA5050 §6.6.2, an update must NOT alter the released base — so
+# this contains ONLY the stitch point (N1, identical to base) + the
+# newly-released horizon (N2). Master's stitcher merges this with the
+# active base order.
+#
+# Prereq: stitch_base.yaml already ASSIGNED and AGV reached N1.
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+order:
+  header:
+    header_id: 1
+    timestamp: 0
+    version: '2.0.0'
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  order_id: 'sample-stitch'
+  order_update_id: 1
+  zone_set_id: []
+  nodes:
+    # Stitch point — must match base's N1 byte-for-byte
+    - {node_id: 'N1', sequence_id: 2, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 5.0, y: 0.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+    # Newly-released horizon
+    - {node_id: 'N2', sequence_id: 4, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 5.0, y: 5.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+  edges:
+    - {edge_id: 'E2', sequence_id: 3, start_node_id: 'N1', end_node_id: 'N2',
+       released: true, actions: [], edge_description: [],
+       max_speed: [1.0], length: [5.0],
+       max_height: [], min_height: [],
+       orientation: [], orientation_type: [],
+       direction: [], rotation_allowed: [], max_rotation_speed: [],
+       trajectory: []}

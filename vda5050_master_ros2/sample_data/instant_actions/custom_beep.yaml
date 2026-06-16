@@ -1,0 +1,23 @@
+# Custom action — `customBeep` is not a predefined VDA5050 action, so
+# behaviour depends on the AGV's factsheet declaring it. With the
+# default mock_client / example_client (no custom action support),
+# the master forwards it; the AGV responds based on its handler logic
+# (mock_client logs and FAILED-acks; example_client logs and ignores).
+#
+# Useful for testing the master's custom-action passthrough (it does
+# NOT validate action_type against any allowlist for custom actions).
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+instant_actions:
+  header:
+    header_id: 0
+    timestamp: 0
+    version: '2.0.0'
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  actions:
+    - {action_id: 'sample-custom-beep-1',
+       action_type: 'customBeep',
+       blocking_type: 'NONE',
+       action_description: ['Beep three times'],
+       action_parameters: [{key: 'count', value: '3', valueDataType: 'INTEGER'}]}

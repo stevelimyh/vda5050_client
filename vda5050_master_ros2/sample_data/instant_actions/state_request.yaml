@@ -1,0 +1,21 @@
+# stateRequest — predefined VDA5050 instant action requesting an
+# immediate State publish from the AGV. Allowlisted across all
+# operating modes (per spec §6.8.2.6) so this works even when the
+# AGV is not in AUTOMATIC.
+#
+# Expected response: decision=0 (ASSIGNED). AGV acks within 1 tick.
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+instant_actions:
+  header:
+    header_id: 0
+    timestamp: 0
+    version: '2.0.0'
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  actions:
+    - {action_id: 'sample-state-req-1',
+       action_type: 'stateRequest',
+       blocking_type: 'NONE',
+       action_description: [],
+       action_parameters: []}

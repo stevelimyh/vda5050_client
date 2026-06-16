@@ -1,0 +1,32 @@
+# GetMasterBrokerStatus — return the master's own MQTT-broker connection
+# state. Operator diagnostics for "is the master itself online?"
+#
+# **Why this exists**: an FMS operator needs to distinguish a per-AGV
+# connection problem (one AGV's last-will fired) from the master itself
+# losing its broker (no orders can flow to ANY AGV). GetDeviceStatus
+# answers the per-AGV question; this service answers the master-broker
+# question.
+#
+# Pairs with the on_broker_disconnected / on_broker_reconnected virtuals
+# on VDA5050Master and the BrokerStatusSnapshot exposed via
+# get_broker_status() (Task #70).
+#
+# Request takes no fields — there is one master-broker connection per
+# master process.
+---
+# True iff the master is currently connected to its broker. Distinct
+# from per-AGV connection state in GetDeviceStatus.
+bool connected
+
+# Wall-clock time at which the master last observed a broker
+# disconnect. Expressed as `Time[<=1]` (length 0 or 1): empty when
+# no disconnect has occurred since the master process started;
+# single element after the first disconnect event. Callers check
+# via `.empty()` and access via `[0]` when present.
+builtin_interfaces/Time[<=1] last_disconnect_at
+
+# Number of times the master's broker connection has been
+# (re)established since the process started. Initial successful
+# connect counts as 1; each Paho-driven auto-reconnect increments by 1.
+# A value of 0 means the master has never successfully connected.
+uint64 reconnect_count

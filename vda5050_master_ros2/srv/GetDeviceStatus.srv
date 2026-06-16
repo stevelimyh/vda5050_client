@@ -1,0 +1,50 @@
+# GetDeviceStatus — query the master's cached State, Connection, and
+# Factsheet snapshot for one AGV. Service half of Task #48 / VM-AMQP-3.
+#
+# The master maintains a per-AGV cache of the latest State, Connection,
+# and Factsheet messages received over MQTT. This service returns that
+# cached snapshot synchronously, atomically (single mutex acquisition),
+# without forcing a fresh fetch from the AGV. For a forced refresh, send
+# a stateRequest or factsheetRequest instant action.
+
+string manufacturer
+string serial_number
+---
+# Status enum.
+#
+# SUCCESS: at least one of state/connection has been observed; the
+#   corresponding optional payloads below carry the latest cached
+#   values. An empty factsheet array alone is normal — the Factsheet
+#   is request/response, not heartbeat — and does NOT block SUCCESS.
+# INVALID_REQUEST: manufacturer or serial_number is empty in the request.
+# AGV_NOT_ONBOARDED: no AGV with that {manufacturer, serial_number} is in
+#   the master's onboarded list.
+# AGV_SILENT: the AGV is onboarded but the master has never received a
+#   State or Connection message from it.
+uint8 SUCCESS=0
+uint8 INVALID_REQUEST=1
+uint8 AGV_NOT_ONBOARDED=2
+uint8 AGV_SILENT=3
+uint8 status
+
+# Echo of the request {manufacturer, serial_number}. FMS clients that
+# fan out N async calls correlate replies by these fields.
+string manufacturer
+string serial_number
+
+# Optional payloads. Expressed as bounded arrays of length 0 or 1:
+# empty = absent, single element = present. This is the ROS 2 IDL
+# idiom for optional fields. Callers check via `.empty()` and access
+# via `[0]` when populated.
+vda5050_interfaces/State[<=1] state
+vda5050_interfaces/Connection[<=1] connection
+vda5050_interfaces/Factsheet[<=1] factsheet
+
+# Master-side cache freshness. Each is the wall-clock time at which the
+# master most recently received the corresponding payload from the AGV.
+# Expressed as `Time[<=1]` (length 0 or 1): empty when the matching
+# payload above is empty; single element when populated. Callers check
+# via `.empty()` and access via `[0]` when present.
+builtin_interfaces/Time[<=1] state_received_at
+builtin_interfaces/Time[<=1] connection_received_at
+builtin_interfaces/Time[<=1] factsheet_received_at

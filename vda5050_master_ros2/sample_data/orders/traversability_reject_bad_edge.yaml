@@ -1,0 +1,48 @@
+# Validator demo: traversabilityValidationError — edge not in loaded map.
+# Identical to happy_path.yaml EXCEPT edge_id='BOGUS' — not present in
+# sample_map.json. Master accepts the AssignOrder service call
+# synchronously (decision=0 ASSIGNED) but the async traversability
+# validator on the queue-processor thread rejects it before MQTT
+# publish. The order NEVER reaches the AGV.
+#
+# Expected:
+#   - Sync response: decision=0 (ASSIGNED) — pre-flight passed
+#   - T2 master log:
+#     [ERROR] Order validation failed for Manufacturer/S001: 1 error(s)
+#     [ERROR]   - type=traversabilityValidationError level=WARNING
+#               desc=Order edge_id 'BOGUS' is not present in the master's loaded map.
+manufacturer: 'Manufacturer'
+serial_number: 'S001'
+order:
+  header:
+    header_id: 0
+    timestamp: 0
+    version: '2.0.0'
+    manufacturer: 'Manufacturer'
+    serial_number: 'S001'
+  order_id: 'sample-traversability-bad-edge'
+  order_update_id: 0
+  zone_set_id: []
+  nodes:
+    - {node_id: 'N0', sequence_id: 0, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 0.0, y: 0.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+    - {node_id: 'N1', sequence_id: 2, released: true, actions: [],
+       node_description: [],
+       node_position: [{x: 5.0, y: 0.0, theta: [0.0],
+                        allowed_deviation_x_y: [0.5],
+                        allowed_deviation_theta: [0.1],
+                        map_id: 'warehouse_floor1',
+                        map_description: []}]}
+  edges:
+    - {edge_id: 'BOGUS', sequence_id: 1, start_node_id: 'N0', end_node_id: 'N1',
+       released: true, actions: [], edge_description: [],
+       max_speed: [1.0], length: [5.0],
+       max_height: [], min_height: [],
+       orientation: [], orientation_type: [],
+       direction: [], rotation_allowed: [], max_rotation_speed: [],
+       trajectory: []}

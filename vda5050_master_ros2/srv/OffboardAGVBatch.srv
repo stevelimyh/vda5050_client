@@ -1,0 +1,17 @@
+# OffboardAGVs — deregister multiple AGVs from the master in one call.
+# Batch sibling of OffboardAGV.srv. Wraps VDA5050Master::offboard_agv_batch.
+#
+# **Idempotent per entry**: keys not currently onboarded are silently
+# ignored and do not count toward `offboarded_count`. Empty-mfg/sn
+# entries are also silently ignored.
+#
+# **When to use**: fleet teardown, DM-driven reconciliation, or any
+# client with >1 AGV to deregister at once. For one-shot operator calls
+# use OffboardAGV.srv (single).
+
+AGVKey[] agvs
+---
+# Number of AGVs actually offboarded (were present in agvs_ at call
+# time). Missing keys and empty-mfg/sn entries are silently ignored
+# and do not count.
+uint32 offboarded_count
