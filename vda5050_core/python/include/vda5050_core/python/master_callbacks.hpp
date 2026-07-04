@@ -26,6 +26,7 @@
 #include <string>
 #include <utility>
 
+#include "vda5050_core/logger/logger.hpp"
 #include "vda5050_core/master/master.hpp"
 #include "vda5050_core/transport/paho_mqtt_client.hpp"
 #include "vda5050_core/types/connection.hpp"
@@ -33,26 +34,29 @@
 #include "vda5050_core/types/state.hpp"
 #include "vda5050_core/types/visualization.hpp"
 
-namespace vda5050_core::python::master {
+namespace vda5050_core {
+
+namespace python {
+
+namespace master {
 
 /// \brief Python-facing adapter over VDA5050Master.
 ///
-/// VDA5050Master reports events through virtual overrides (on_state, ...).
-/// Python can't subclass those cleanly, so this subclass turns each virtual
-/// into a settable std::function callback (bound as master.on_state = fn).
-/// Each override acquires the GIL before entering Python, since the virtuals
-/// fire on the per-AGV MQTT threads, not the Python thread.
+/// VDA5050Master reports events through virtual overrides. This subclass turns
+/// each into a settable std::function callback (`master.on_state = fn`). The
+/// virtuals fire on per-AGV MQTT threads, so every dispatch acquires the GIL
+/// and swallows a raised Python exception so it can't abort that thread.
 class PyMaster : public vda5050_core::master::VDA5050Master
 {
 public:
   using StateCb =
-    std::function<void(std::string, vda5050_core::types::State)>;
-  using ConnectionCb =
-    std::function<void(std::string, vda5050_core::types::Connection)>;
-  using FactsheetCb =
-    std::function<void(std::string, vda5050_core::types::Factsheet)>;
-  using VisualizationCb =
-    std::function<void(std::string, vda5050_core::types::Visualization)>;
+    std::function<void(const std::string&, const vda5050_core::types::State&)>;
+  using ConnectionCb = std::function<void(
+    const std::string&, const vda5050_core::types::Connection&)>;
+  using FactsheetCb = std::function<void(
+    const std::string&, const vda5050_core::types::Factsheet&)>;
+  using VisualizationCb = std::function<void(
+    const std::string&, const vda5050_core::types::Visualization&)>;
 
   explicit PyMaster(
     std::shared_ptr<vda5050_core::transport::MqttClientInterface> mqtt_client)
@@ -60,10 +64,13 @@ public:
   {
   }
 
-  /// \brief Convenience factory: build the Paho MQTT client internally.
+  /// \brief Build a master with an internally-created Paho MQTT client.
   ///
   /// \param broker_address MQTT broker address (e.g. "tcp://localhost:1883").
   /// \param client_id      MQTT client id for this master.
+  /// \return shared_ptr — the master requires make_shared
+  ///         (enable_shared_from_this); a stack/unique instance breaks its
+  ///         callback dispatch.
   static std::shared_ptr<PyMaster> create(
     const std::string& broker_address, const std::string& client_id)
   {
@@ -78,50 +85,53 @@ public:
   VisualizationCb on_visualization_cb;
 
   void on_state(
-    const std::string& agv_id,
-    const vda5050_core::types::State& state) override
+    const std::string& agv_id, const vda5050_core::types::State& state) override
   {
-    if (on_state_cb)
-    {
-      pybind11::gil_scoped_acquire gil;
-      on_state_cb(agv_id, state);
-    }
+    dispatch(on_state_cb, "on_state", agv_id, state);
   }
 
   void on_connection(
     const std::string& agv_id,
     const vda5050_core::types::Connection& connection) override
   {
-    if (on_connection_cb)
-    {
-      pybind11::gil_scoped_acquire gil;
-      on_connection_cb(agv_id, connection);
-    }
+    dispatch(on_connection_cb, "on_connection", agv_id, connection);
   }
 
   void on_factsheet(
     const std::string& agv_id,
     const vda5050_core::types::Factsheet& factsheet) override
   {
-    if (on_factsheet_cb)
-    {
-      pybind11::gil_scoped_acquire gil;
-      on_factsheet_cb(agv_id, factsheet);
-    }
+    dispatch(on_factsheet_cb, "on_factsheet", agv_id, factsheet);
   }
 
   void on_visualization(
     const std::string& agv_id,
     const vda5050_core::types::Visualization& visualization) override
   {
-    if (on_visualization_cb)
+    dispatch(on_visualization_cb, "on_visualization", agv_id, visualization);
+  }
+
+private:
+  /// \brief Run a Python callback under the GIL; unset → no-op, raised Python
+  ///        exception is logged, not propagated onto the MQTT thread.
+  template <typename Cb, typename... Args>
+  void dispatch(const Cb& cb, const char* name, Args&&... args)
+  {
+    if (!cb) return;
+    pybind11::gil_scoped_acquire gil;
+    try
     {
-      pybind11::gil_scoped_acquire gil;
-      on_visualization_cb(agv_id, visualization);
+      cb(std::forward<Args>(args)...);
+    }
+    catch (pybind11::error_already_set& e)
+    {
+      VDA5050_ERROR("Python {} callback raised: {}", name, e.what());
     }
   }
 };
 
-}  // namespace vda5050_core::python::master
+}  // namespace master
+}  // namespace python
+}  // namespace vda5050_core
 
 #endif  // VDA5050_CORE__PYTHON__MASTER_CALLBACKS_HPP_

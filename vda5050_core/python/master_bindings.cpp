@@ -16,13 +16,28 @@
  * limitations under the License.
  */
 
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
+#include <memory>
+
+#include "vda5050_core/python/master_callbacks.hpp"
+
 namespace py = pybind11;
+namespace pym = vda5050_core::python::master;
 
 PYBIND11_MODULE(vda5050_master_python, m)
 {
   m.doc() = "VDA5050 fleet-master Python bindings";
 
-  m.def_submodule("master", "VDA5050 fleet master API");
+  auto m_master = m.def_submodule("master", "VDA5050 fleet master API");
+
+  py::class_<pym::PyMaster, std::shared_ptr<pym::PyMaster>>(m_master, "Master")
+    .def(
+      py::init(&pym::PyMaster::create), py::arg("broker_address"),
+      py::arg("client_id"))
+    .def_readwrite("on_state", &pym::PyMaster::on_state_cb)
+    .def_readwrite("on_connection", &pym::PyMaster::on_connection_cb)
+    .def_readwrite("on_factsheet", &pym::PyMaster::on_factsheet_cb)
+    .def_readwrite("on_visualization", &pym::PyMaster::on_visualization_cb);
 }
