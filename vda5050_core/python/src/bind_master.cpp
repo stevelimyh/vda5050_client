@@ -160,6 +160,16 @@ void register_master(py::module_& m)
       "factsheet_received_at",
       &master::AGV::StatusSnapshot::factsheet_received_at);
 
+  py::class_<master::AGV::ModeCancelledQueue>(
+    m, "ModeCancelledQueue", py::module_local())
+    .def_readonly("orders", &master::AGV::ModeCancelledQueue::orders)
+    .def_readonly(
+      "instant_actions", &master::AGV::ModeCancelledQueue::instant_actions)
+    .def_readonly(
+      "cancelled_at", &master::AGV::ModeCancelledQueue::cancelled_at)
+    .def_readonly("from_mode", &master::AGV::ModeCancelledQueue::from_mode)
+    .def_readonly("to_mode", &master::AGV::ModeCancelledQueue::to_mode);
+
   py::class_<master::VDA5050Master::OnboardSpec>(
     m, "OnboardSpec", py::module_local())
     .def(py::init<>())
@@ -209,7 +219,16 @@ void register_master(py::module_& m)
     .def(
       "active_order_needs_more_base",
       &master::AGV::active_order_needs_more_base)
-    .def("active_order_snapshot", &master::AGV::active_order_snapshot);
+    .def("active_order_snapshot", &master::AGV::active_order_snapshot)
+    .def("get_created_time", &master::AGV::get_created_time)
+    .def("get_mode_cancelled_queue", &master::AGV::get_mode_cancelled_queue)
+    .def(
+      "resume_mode_cancelled_queue", &master::AGV::resume_mode_cancelled_queue,
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "discard_mode_cancelled_queue",
+      &master::AGV::discard_mode_cancelled_queue,
+      py::call_guard<py::gil_scoped_release>());
 }
 
 }  // namespace vda5050_core::python
