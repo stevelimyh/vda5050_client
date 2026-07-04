@@ -20,9 +20,10 @@ Injects a conforming Connection + State into the master through the AGV's
 handle_* message hooks (exactly as the C++ integration tests do), then asserts
 the Python callbacks fire with the real messages, the AGV becomes AVAILABLE,
 its fused pose reflects the state, and assign_order then succeeds. This
-exercises the full inbound path (message -> event detection -> callback
-dispatch -> marshal into Python) plus the assign_order readiness gate. No
-broker is required; messages are injected directly.
+exercises the inbound path from the message handler onward (event detection ->
+callback dispatch -> marshal into Python) plus the assign_order readiness gate;
+JSON deserialization and the MQTT subscriber are not covered. No broker is
+required; messages are injected directly.
 """
 
 import vda5050_master_python as v
