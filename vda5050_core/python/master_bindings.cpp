@@ -18,14 +18,18 @@
 
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
+#include <cstddef>
 #include <memory>
+#include <string>
 
 #include "vda5050_core/python/master_callbacks.hpp"
 #include "vda5050_core/python/register.hpp"
 
 namespace py = pybind11;
 namespace pym = vda5050_core::python::master;
+namespace vm = vda5050_core::master;
 
 PYBIND11_MODULE(vda5050_master_python, m)
 {
@@ -44,5 +48,67 @@ PYBIND11_MODULE(vda5050_master_python, m)
     .def_readwrite("on_state", &pym::PyMaster::on_state_cb)
     .def_readwrite("on_connection", &pym::PyMaster::on_connection_cb)
     .def_readwrite("on_factsheet", &pym::PyMaster::on_factsheet_cb)
-    .def_readwrite("on_visualization", &pym::PyMaster::on_visualization_cb);
+    .def_readwrite("on_visualization", &pym::PyMaster::on_visualization_cb)
+    .def(
+      "connect", &vm::VDA5050Master::connect,
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "disconnect", &vm::VDA5050Master::disconnect,
+      py::call_guard<py::gil_scoped_release>())
+    .def("is_connected", &vm::VDA5050Master::is_connected)
+    .def("get_broker_status", &vm::VDA5050Master::get_broker_status)
+    .def(
+      "onboard_agv",
+      py::overload_cast<const std::string&, const std::string&, size_t, bool>(
+        &vm::VDA5050Master::onboard_agv),
+      py::arg("manufacturer"), py::arg("serial_number"),
+      py::arg("max_queue_size") = 10, py::arg("drop_oldest") = true,
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "onboard_agv",
+      py::overload_cast<
+        const std::string&, const std::string&, const std::string&, size_t,
+        bool>(&vm::VDA5050Master::onboard_agv),
+      py::arg("interface_name"), py::arg("manufacturer"),
+      py::arg("serial_number"), py::arg("max_queue_size") = 10,
+      py::arg("drop_oldest") = true, py::call_guard<py::gil_scoped_release>())
+    .def(
+      "onboard_agv_batch", &vm::VDA5050Master::onboard_agv_batch,
+      py::arg("specs"), py::call_guard<py::gil_scoped_release>())
+    .def(
+      "offboard_agv", &vm::VDA5050Master::offboard_agv, py::arg("manufacturer"),
+      py::arg("serial_number"), py::call_guard<py::gil_scoped_release>())
+    .def(
+      "offboard_agv_batch", &vm::VDA5050Master::offboard_agv_batch,
+      py::arg("keys"), py::call_guard<py::gil_scoped_release>())
+    .def(
+      "is_agv_onboarded", &vm::VDA5050Master::is_agv_onboarded,
+      py::arg("manufacturer"), py::arg("serial_number"))
+    .def("get_onboarded_agvs", &vm::VDA5050Master::get_onboarded_agvs)
+    .def(
+      "publish_order", &vm::VDA5050Master::publish_order,
+      py::arg("manufacturer"), py::arg("serial_number"), py::arg("order"),
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "assign_order", &vm::VDA5050Master::assign_order, py::arg("manufacturer"),
+      py::arg("serial_number"), py::arg("order"),
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "publish_instant_actions", &vm::VDA5050Master::publish_instant_actions,
+      py::arg("manufacturer"), py::arg("serial_number"), py::arg("actions"),
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "assign_instant_actions", &vm::VDA5050Master::assign_instant_actions,
+      py::arg("manufacturer"), py::arg("serial_number"), py::arg("actions"),
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "record_assignment", &vm::VDA5050Master::record_assignment,
+      py::arg("manufacturer"), py::arg("serial_number"),
+      py::arg("assignment_id"), py::arg("order_id"), py::arg("order_update_id"))
+    .def(
+      "get_active_assignment_id", &vm::VDA5050Master::get_active_assignment_id,
+      py::arg("manufacturer"), py::arg("serial_number"))
+    .def(
+      "clear_assignment", &vm::VDA5050Master::clear_assignment,
+      py::arg("manufacturer"), py::arg("serial_number"));
 }

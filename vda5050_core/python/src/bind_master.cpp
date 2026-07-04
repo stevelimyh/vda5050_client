@@ -157,6 +157,27 @@ void register_master(py::module_& m)
     .def_readonly(
       "factsheet_received_at",
       &master::AGV::StatusSnapshot::factsheet_received_at);
+
+  py::class_<master::VDA5050Master::OnboardSpec>(
+    m, "OnboardSpec", py::module_local())
+    .def(py::init<>())
+    .def_readwrite(
+      "manufacturer", &master::VDA5050Master::OnboardSpec::manufacturer)
+    .def_readwrite(
+      "serial_number", &master::VDA5050Master::OnboardSpec::serial_number)
+    .def_readwrite(
+      "max_queue_size", &master::VDA5050Master::OnboardSpec::max_queue_size)
+    .def_readwrite(
+      "drop_oldest", &master::VDA5050Master::OnboardSpec::drop_oldest);
+
+  py::class_<master::VDA5050Master::BatchOnboardResult>(
+    m, "BatchOnboardResult", py::module_local())
+    .def_readonly(
+      "onboarded", &master::VDA5050Master::BatchOnboardResult::onboarded)
+    .def_readonly(
+      "skipped_already_onboarded",
+      &master::VDA5050Master::BatchOnboardResult::skipped_already_onboarded)
+    .def_readonly("failed", &master::VDA5050Master::BatchOnboardResult::failed);
 }
 
 }  // namespace vda5050_core::python
