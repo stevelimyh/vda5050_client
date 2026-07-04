@@ -21,13 +21,17 @@
 #include <pybind11/stl.h>
 
 #include "vda5050_core/python/register.hpp"
+#include "vda5050_core/types/action.hpp"
+#include "vda5050_core/types/action_parameter.hpp"
 #include "vda5050_core/types/action_state.hpp"
 #include "vda5050_core/types/action_status.hpp"
 #include "vda5050_core/types/agv_position.hpp"
 #include "vda5050_core/types/battery_state.hpp"
+#include "vda5050_core/types/blocking_type.hpp"
 #include "vda5050_core/types/connection.hpp"
 #include "vda5050_core/types/connection_state.hpp"
 #include "vda5050_core/types/e_stop.hpp"
+#include "vda5050_core/types/edge.hpp"
 #include "vda5050_core/types/edge_state.hpp"
 #include "vda5050_core/types/error.hpp"
 #include "vda5050_core/types/error_level.hpp"
@@ -36,9 +40,11 @@
 #include "vda5050_core/types/info.hpp"
 #include "vda5050_core/types/info_level.hpp"
 #include "vda5050_core/types/info_reference.hpp"
+#include "vda5050_core/types/node.hpp"
 #include "vda5050_core/types/node_position.hpp"
 #include "vda5050_core/types/node_state.hpp"
 #include "vda5050_core/types/operating_mode.hpp"
+#include "vda5050_core/types/order.hpp"
 #include "vda5050_core/types/safety_state.hpp"
 #include "vda5050_core/types/state.hpp"
 #include "vda5050_core/types/velocity.hpp"
@@ -243,6 +249,70 @@ void register_types(py::module_& m)
     .def_readwrite("connection_state", &types::Connection::connection_state)
     .def("__eq__", &types::Connection::operator==)
     .def("__ne__", &types::Connection::operator!=);
+
+  py::enum_<types::BlockingType>(m, "BlockingType", py::module_local())
+    .value("NONE", types::BlockingType::NONE)
+    .value("SOFT", types::BlockingType::SOFT)
+    .value("HARD", types::BlockingType::HARD);
+
+  py::class_<types::ActionParameter>(m, "ActionParameter", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("key", &types::ActionParameter::key)
+    .def_readwrite("value", &types::ActionParameter::value)
+    .def("__eq__", &types::ActionParameter::operator==)
+    .def("__ne__", &types::ActionParameter::operator!=);
+
+  py::class_<types::Action>(m, "Action", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("action_type", &types::Action::action_type)
+    .def_readwrite("action_id", &types::Action::action_id)
+    .def_readwrite("blocking_type", &types::Action::blocking_type)
+    .def_readwrite("action_description", &types::Action::action_description)
+    .def_readwrite("action_parameters", &types::Action::action_parameters)
+    .def("__eq__", &types::Action::operator==)
+    .def("__ne__", &types::Action::operator!=);
+
+  py::class_<types::Node>(m, "Node", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("node_id", &types::Node::node_id)
+    .def_readwrite("sequence_id", &types::Node::sequence_id)
+    .def_readwrite("released", &types::Node::released)
+    .def_readwrite("actions", &types::Node::actions)
+    .def_readwrite("node_position", &types::Node::node_position)
+    .def_readwrite("node_description", &types::Node::node_description)
+    .def("__eq__", &types::Node::operator==)
+    .def("__ne__", &types::Node::operator!=);
+
+  py::class_<types::Edge>(m, "Edge", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("edge_id", &types::Edge::edge_id)
+    .def_readwrite("sequence_id", &types::Edge::sequence_id)
+    .def_readwrite("start_node_id", &types::Edge::start_node_id)
+    .def_readwrite("end_node_id", &types::Edge::end_node_id)
+    .def_readwrite("released", &types::Edge::released)
+    .def_readwrite("actions", &types::Edge::actions)
+    .def_readwrite("edge_description", &types::Edge::edge_description)
+    .def_readwrite("max_speed", &types::Edge::max_speed)
+    .def_readwrite("max_height", &types::Edge::max_height)
+    .def_readwrite("min_height", &types::Edge::min_height)
+    .def_readwrite("orientation", &types::Edge::orientation)
+    .def_readwrite("direction", &types::Edge::direction)
+    .def_readwrite("rotation_allowed", &types::Edge::rotation_allowed)
+    .def_readwrite("max_rotation_speed", &types::Edge::max_rotation_speed)
+    .def_readwrite("length", &types::Edge::length)
+    .def("__eq__", &types::Edge::operator==)
+    .def("__ne__", &types::Edge::operator!=);
+
+  py::class_<types::Order>(m, "Order", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("header", &types::Order::header)
+    .def_readwrite("order_id", &types::Order::order_id)
+    .def_readwrite("order_update_id", &types::Order::order_update_id)
+    .def_readwrite("nodes", &types::Order::nodes)
+    .def_readwrite("edges", &types::Order::edges)
+    .def_readwrite("zone_set_id", &types::Order::zone_set_id)
+    .def("__eq__", &types::Order::operator==)
+    .def("__ne__", &types::Order::operator!=);
 }
 
 }  // namespace vda5050_core::python
