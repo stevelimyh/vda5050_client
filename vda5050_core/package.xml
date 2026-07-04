@@ -21,6 +21,10 @@
   <depend>libpaho-mqttpp-dev</depend>
   <depend>fmt</depend>
 
+  <build_depend>ament_cmake_python</build_depend>
+  <build_depend>pybind11_vendor</build_depend>
+  <build_depend>python3-dev</build_depend>
+
   <test_depend>ament_cmake_cppcheck</test_depend>
   <test_depend>ament_cmake_cpplint</test_depend>
   <test_depend>ament_cmake_clang_format</test_depend>

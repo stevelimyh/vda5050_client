@@ -248,6 +248,12 @@ if(ENABLE_ROS2)
   ament_export_dependencies(vda5050_interfaces)
 endif()
 
+option(BUILD_PYTHON "Build Python bindings" OFF)
+
+if(BUILD_PYTHON)
+  add_subdirectory(python)
+endif()
+
 option(BUILD_EXAMPLES "Build examples" ON)
 
 if(BUILD_EXAMPLES)
