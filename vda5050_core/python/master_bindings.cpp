@@ -16,6 +16,10 @@
  * limitations under the License.
  */
 
+// Draft-standalone module; converges into #71's vda5050_core_python once it
+// merges. Shared vda5050_core::types are module_local so the two modules can be
+// imported together until then.
+
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
