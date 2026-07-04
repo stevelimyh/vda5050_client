@@ -31,6 +31,9 @@ namespace python {
 /// alongside another pybind module that binds the same vda5050_core::types.
 void register_types(pybind11::module_& m);
 
+/// \brief Bind master control results, snapshots, and enums into module `m`.
+void register_master(pybind11::module_& m);
+
 }  // namespace python
 }  // namespace vda5050_core
 

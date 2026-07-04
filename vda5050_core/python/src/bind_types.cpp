@@ -40,6 +40,7 @@
 #include "vda5050_core/types/info.hpp"
 #include "vda5050_core/types/info_level.hpp"
 #include "vda5050_core/types/info_reference.hpp"
+#include "vda5050_core/types/instant_actions.hpp"
 #include "vda5050_core/types/node.hpp"
 #include "vda5050_core/types/node_position.hpp"
 #include "vda5050_core/types/node_state.hpp"
@@ -313,6 +314,13 @@ void register_types(py::module_& m)
     .def_readwrite("zone_set_id", &types::Order::zone_set_id)
     .def("__eq__", &types::Order::operator==)
     .def("__ne__", &types::Order::operator!=);
+
+  py::class_<types::InstantActions>(m, "InstantActions", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("header", &types::InstantActions::header)
+    .def_readwrite("actions", &types::InstantActions::actions)
+    .def("__eq__", &types::InstantActions::operator==)
+    .def("__ne__", &types::InstantActions::operator!=);
 }
 
 }  // namespace vda5050_core::python

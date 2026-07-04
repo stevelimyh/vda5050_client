@@ -5,6 +5,7 @@ find_package(pybind11 REQUIRED)
 pybind11_add_module(vda5050_master_python
   master_bindings.cpp
   src/bind_types.cpp
+  src/bind_master.cpp
 )
 
 target_link_libraries(vda5050_master_python
