@@ -20,6 +20,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <memory>
+
 #include "vda5050_core/master/actions/instant_action_assignment_result.hpp"
 #include "vda5050_core/master/agv.hpp"
 #include "vda5050_core/master/assignment_result.hpp"
@@ -178,6 +180,36 @@ void register_master(py::module_& m)
       "skipped_already_onboarded",
       &master::VDA5050Master::BatchOnboardResult::skipped_already_onboarded)
     .def_readonly("failed", &master::VDA5050Master::BatchOnboardResult::failed);
+
+  py::class_<master::AGV, std::shared_ptr<master::AGV>>(
+    m, "AGV", py::module_local())
+    .def("is_connected", &master::AGV::is_connected)
+    .def("get_operational_state", &master::AGV::get_operational_state)
+    .def("stop", &master::AGV::stop, py::call_guard<py::gil_scoped_release>())
+    .def(
+      "restart", &master::AGV::restart,
+      py::call_guard<py::gil_scoped_release>())
+    .def("pause", &master::AGV::pause, py::call_guard<py::gil_scoped_release>())
+    .def(
+      "resume", &master::AGV::resume, py::call_guard<py::gil_scoped_release>())
+    .def(
+      "send_order", &master::AGV::send_order, py::arg("order"),
+      py::call_guard<py::gil_scoped_release>())
+    .def(
+      "send_instant_actions", &master::AGV::send_instant_actions,
+      py::arg("actions"), py::call_guard<py::gil_scoped_release>())
+    .def(
+      "cancel_pending_orders", &master::AGV::cancel_pending_orders,
+      py::call_guard<py::gil_scoped_release>())
+    .def("get_status_snapshot", &master::AGV::get_status_snapshot)
+    .def("get_order_status_bundle", &master::AGV::get_order_status_bundle)
+    .def("get_pose_view", &master::AGV::get_pose_view)
+    .def("has_active_order", &master::AGV::has_active_order)
+    .def("is_order_complete", &master::AGV::is_order_complete)
+    .def(
+      "active_order_needs_more_base",
+      &master::AGV::active_order_needs_more_base)
+    .def("active_order_snapshot", &master::AGV::active_order_snapshot);
 }
 
 }  // namespace vda5050_core::python

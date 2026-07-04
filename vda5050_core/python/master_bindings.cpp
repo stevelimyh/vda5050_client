@@ -110,5 +110,8 @@ PYBIND11_MODULE(vda5050_master_python, m)
       py::arg("manufacturer"), py::arg("serial_number"))
     .def(
       "clear_assignment", &vm::VDA5050Master::clear_assignment,
-      py::arg("manufacturer"), py::arg("serial_number"));
+      py::arg("manufacturer"), py::arg("serial_number"))
+    .def(
+      "get_agv", &vm::VDA5050Master::get_agv, py::arg("manufacturer"),
+      py::arg("serial_number"));
 }
