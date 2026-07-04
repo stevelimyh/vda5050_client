@@ -31,6 +31,7 @@
 #include "vda5050_core/types/bounding_box_reference.hpp"
 #include "vda5050_core/types/connection.hpp"
 #include "vda5050_core/types/connection_state.hpp"
+#include "vda5050_core/types/control_point.hpp"
 #include "vda5050_core/types/e_stop.hpp"
 #include "vda5050_core/types/edge.hpp"
 #include "vda5050_core/types/edge_state.hpp"
@@ -49,8 +50,10 @@
 #include "vda5050_core/types/node_state.hpp"
 #include "vda5050_core/types/operating_mode.hpp"
 #include "vda5050_core/types/order.hpp"
+#include "vda5050_core/types/orientation_type.hpp"
 #include "vda5050_core/types/safety_state.hpp"
 #include "vda5050_core/types/state.hpp"
+#include "vda5050_core/types/trajectory.hpp"
 #include "vda5050_core/types/velocity.hpp"
 #include "vda5050_core/types/visualization.hpp"
 
@@ -93,6 +96,10 @@ void register_types(py::module_& m)
     .value("ONLINE", types::ConnectionState::ONLINE)
     .value("OFFLINE", types::ConnectionState::OFFLINE)
     .value("CONNECTIONBROKEN", types::ConnectionState::CONNECTIONBROKEN);
+
+  py::enum_<types::OrientationType>(m, "OrientationType", py::module_local())
+    .value("GLOBAL", types::OrientationType::GLOBAL)
+    .value("TANGENTIAL", types::OrientationType::TANGENTIAL);
 
   py::class_<types::Header>(m, "Header", py::module_local())
     .def(py::init<>())
@@ -212,12 +219,29 @@ void register_types(py::module_& m)
     .def("__eq__", &types::NodeState::operator==)
     .def("__ne__", &types::NodeState::operator!=);
 
+  py::class_<types::ControlPoint>(m, "ControlPoint", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("x", &types::ControlPoint::x)
+    .def_readwrite("y", &types::ControlPoint::y)
+    .def_readwrite("weight", &types::ControlPoint::weight)
+    .def("__eq__", &types::ControlPoint::operator==)
+    .def("__ne__", &types::ControlPoint::operator!=);
+
+  py::class_<types::Trajectory>(m, "Trajectory", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("degree", &types::Trajectory::degree)
+    .def_readwrite("knot_vector", &types::Trajectory::knot_vector)
+    .def_readwrite("control_points", &types::Trajectory::control_points)
+    .def("__eq__", &types::Trajectory::operator==)
+    .def("__ne__", &types::Trajectory::operator!=);
+
   py::class_<types::EdgeState>(m, "EdgeState", py::module_local())
     .def(py::init<>())
     .def_readwrite("edge_id", &types::EdgeState::edge_id)
     .def_readwrite("sequence_id", &types::EdgeState::sequence_id)
     .def_readwrite("edge_description", &types::EdgeState::edge_description)
     .def_readwrite("released", &types::EdgeState::released)
+    .def_readwrite("trajectory", &types::EdgeState::trajectory)
     .def("__eq__", &types::EdgeState::operator==)
     .def("__ne__", &types::EdgeState::operator!=);
 
@@ -340,9 +364,11 @@ void register_types(py::module_& m)
     .def_readwrite("max_height", &types::Edge::max_height)
     .def_readwrite("min_height", &types::Edge::min_height)
     .def_readwrite("orientation", &types::Edge::orientation)
+    .def_readwrite("orientation_type", &types::Edge::orientation_type)
     .def_readwrite("direction", &types::Edge::direction)
     .def_readwrite("rotation_allowed", &types::Edge::rotation_allowed)
     .def_readwrite("max_rotation_speed", &types::Edge::max_rotation_speed)
+    .def_readwrite("trajectory", &types::Edge::trajectory)
     .def_readwrite("length", &types::Edge::length)
     .def("__eq__", &types::Edge::operator==)
     .def("__ne__", &types::Edge::operator!=);
