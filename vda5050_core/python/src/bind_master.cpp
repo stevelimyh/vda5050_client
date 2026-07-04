@@ -278,7 +278,13 @@ void register_master(py::module_& m)
     .def(
       "discard_mode_cancelled_queue",
       &master::AGV::discard_mode_cancelled_queue,
-      py::call_guard<py::gil_scoped_release>());
+      py::call_guard<py::gil_scoped_release>())
+    .def("handle_connection", &master::AGV::handle_connection, py::arg("msg"))
+    .def("handle_state", &master::AGV::handle_state, py::arg("msg"))
+    .def("handle_factsheet", &master::AGV::handle_factsheet, py::arg("msg"))
+    .def(
+      "handle_visualization", &master::AGV::handle_visualization,
+      py::arg("msg"));
 }
 
 }  // namespace vda5050_core::python

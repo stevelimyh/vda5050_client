@@ -1,5 +1,5 @@
 find_package(ament_cmake_python REQUIRED)
-find_package(Python3 COMPONENTS Development REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
 
 pybind11_add_module(vda5050_master_python
@@ -23,4 +23,13 @@ target_include_directories(vda5050_master_python
 install(
   TARGETS vda5050_master_python
   DESTINATION lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages
+)
+
+add_test(
+  NAME test_round_trip_python
+  COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/test_round_trip.py
+)
+set_tests_properties(test_round_trip_python PROPERTIES
+  ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:vda5050_master_python>"
 )
