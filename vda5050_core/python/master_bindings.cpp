@@ -138,5 +138,15 @@ PYBIND11_MODULE(vda5050_master_python, m)
       py::arg("manufacturer"), py::arg("serial_number"))
     .def(
       "get_agv", &vm::VDA5050Master::get_agv, py::arg("manufacturer"),
-      py::arg("serial_number"));
+      py::arg("serial_number"))
+    .def(
+      "load_layout_from_config", &vm::VDA5050Master::load_layout_from_config,
+      py::arg("path"), py::call_guard<py::gil_scoped_release>())
+    .def(
+      "refresh_alignment_for_agv",
+      &vm::VDA5050Master::refresh_alignment_for_agv, py::arg("agv_id"),
+      py::arg("factsheet"), py::call_guard<py::gil_scoped_release>())
+    .def(
+      "get_alignment_cache_snapshot",
+      &vm::VDA5050Master::get_alignment_cache_snapshot);
 }

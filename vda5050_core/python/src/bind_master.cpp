@@ -22,12 +22,15 @@
 
 #include <memory>
 
+#include "vda5050_core/layout/layout_loader.hpp"
+#include "vda5050_core/layout/validate_layout.hpp"
 #include "vda5050_core/master/actions/instant_action_assignment_result.hpp"
 #include "vda5050_core/master/agv.hpp"
 #include "vda5050_core/master/assignment_result.hpp"
 #include "vda5050_core/master/master.hpp"
 #include "vda5050_core/master/order/order_lifecycle_manager.hpp"
 #include "vda5050_core/master/pose_view.hpp"
+#include "vda5050_core/master/validation/factsheet_alignment.hpp"
 #include "vda5050_core/python/register.hpp"
 
 namespace py = pybind11;
@@ -169,6 +172,53 @@ void register_master(py::module_& m)
       "cancelled_at", &master::AGV::ModeCancelledQueue::cancelled_at)
     .def_readonly("from_mode", &master::AGV::ModeCancelledQueue::from_mode)
     .def_readonly("to_mode", &master::AGV::ModeCancelledQueue::to_mode);
+
+  py::enum_<layout::LayoutLoadErrorType>(
+    m, "LayoutLoadErrorType", py::module_local())
+    .value("FILE_NOT_FOUND", layout::LayoutLoadErrorType::FILE_NOT_FOUND)
+    .value("FILE_READ_FAILED", layout::LayoutLoadErrorType::FILE_READ_FAILED)
+    .value("JSON_PARSE_ERROR", layout::LayoutLoadErrorType::JSON_PARSE_ERROR)
+    .value(
+      "MISSING_REQUIRED_FIELD",
+      layout::LayoutLoadErrorType::MISSING_REQUIRED_FIELD)
+    .value(
+      "INVALID_FIELD_VALUE", layout::LayoutLoadErrorType::INVALID_FIELD_VALUE)
+    .value("DUPLICATE_ID", layout::LayoutLoadErrorType::DUPLICATE_ID)
+    .value("DANGLING_NODE_REF", layout::LayoutLoadErrorType::DANGLING_NODE_REF)
+    .value(
+      "EMPTY_REQUIRED_ARRAY", layout::LayoutLoadErrorType::EMPTY_REQUIRED_ARRAY)
+    .value(
+      "TRAJECTORY_SIZE_MISMATCH",
+      layout::LayoutLoadErrorType::TRAJECTORY_SIZE_MISMATCH)
+    .value("OUT_OF_RANGE", layout::LayoutLoadErrorType::OUT_OF_RANGE);
+
+  py::class_<layout::LayoutLoadError>(m, "LayoutLoadError", py::module_local())
+    .def_readonly("type", &layout::LayoutLoadError::type)
+    .def_readonly("description", &layout::LayoutLoadError::description);
+
+  // lif field deferred: the parsed LIF tree is not bound.
+  py::class_<layout::LayoutLoadResult>(
+    m, "LayoutLoadResult", py::module_local())
+    .def_readonly("errors", &layout::LayoutLoadResult::errors)
+    .def("__bool__", [](const layout::LayoutLoadResult& r) {
+      return static_cast<bool>(r);
+    });
+
+  py::enum_<master::AlignmentSeverity>(
+    m, "AlignmentSeverity", py::module_local())
+    .value("WARNING", master::AlignmentSeverity::WARNING)
+    .value("ERROR", master::AlignmentSeverity::ERROR);
+
+  py::class_<master::AlignmentFinding>(
+    m, "AlignmentFinding", py::module_local())
+    .def_readonly("severity", &master::AlignmentFinding::severity)
+    .def_readonly("code", &master::AlignmentFinding::code)
+    .def_readonly("description", &master::AlignmentFinding::description);
+
+  py::class_<master::FactsheetAlignmentResult>(
+    m, "FactsheetAlignmentResult", py::module_local())
+    .def_readonly("findings", &master::FactsheetAlignmentResult::findings)
+    .def("has_error", &master::FactsheetAlignmentResult::has_error);
 
   py::class_<master::VDA5050Master::OnboardSpec>(
     m, "OnboardSpec", py::module_local())
