@@ -22,6 +22,7 @@
 #include <memory>
 
 #include "vda5050_core/python/master_callbacks.hpp"
+#include "vda5050_core/python/register.hpp"
 
 namespace py = pybind11;
 namespace pym = vda5050_core::python::master;
@@ -29,6 +30,9 @@ namespace pym = vda5050_core::python::master;
 PYBIND11_MODULE(vda5050_master_python, m)
 {
   m.doc() = "VDA5050 fleet-master Python bindings";
+
+  auto m_types = m.def_submodule("types", "VDA5050 message types and enums");
+  vda5050_core::python::register_types(m_types);
 
   auto m_master = m.def_submodule("master", "VDA5050 fleet master API");
 
