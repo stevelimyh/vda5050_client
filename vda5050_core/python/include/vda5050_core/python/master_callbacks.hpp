@@ -26,11 +26,14 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "vda5050_core/logger/logger.hpp"
 #include "vda5050_core/master/master.hpp"
 #include "vda5050_core/transport/paho_mqtt_client.hpp"
 #include "vda5050_core/types/connection.hpp"
+#include "vda5050_core/types/error.hpp"
+#include "vda5050_core/types/operating_mode.hpp"
 #include "vda5050_core/types/state.hpp"
 #include "vda5050_core/types/visualization.hpp"
 
@@ -55,6 +58,16 @@ public:
     const std::string&, const vda5050_core::types::Connection&)>;
   using VisualizationCb = std::function<void(
     const std::string&, const vda5050_core::types::Visualization&)>;
+  using AgvIdCb = std::function<void(const std::string&)>;
+  using NodeReachedCb =
+    std::function<void(const std::string&, const std::string&)>;
+  using ErrorsCb = std::function<void(
+    const std::string&, const std::vector<vda5050_core::types::Error>&)>;
+  using ModeChangedCb = std::function<void(
+    const std::string&, vda5050_core::types::OperatingMode,
+    vda5050_core::types::OperatingMode)>;
+  using BoolFlagCb = std::function<void(const std::string&, bool)>;
+  using BrokerCb = std::function<void()>;
 
   explicit PyMaster(
     std::shared_ptr<vda5050_core::transport::MqttClientInterface> mqtt_client)
@@ -80,6 +93,20 @@ public:
   StateCb on_state_cb;
   ConnectionCb on_connection_cb;
   VisualizationCb on_visualization_cb;
+  NodeReachedCb on_node_reached_cb;
+  ErrorsCb on_errors_appeared_cb;
+  ErrorsCb on_errors_resolved_cb;
+  AgvIdCb on_new_base_requested_cb;
+  ModeChangedCb on_mode_changed_cb;
+  BoolFlagCb on_paused_cb;
+  BoolFlagCb on_driving_cb;
+  AgvIdCb on_connect_cb;
+  AgvIdCb on_offline_cb;
+  AgvIdCb on_connection_broken_cb;
+  AgvIdCb on_state_timeout_cb;
+  AgvIdCb on_state_resumed_cb;
+  BrokerCb on_broker_disconnected_cb;
+  BrokerCb on_broker_reconnected_cb;
 
   void on_state(
     const std::string& agv_id, const vda5050_core::types::State& state) override
@@ -99,6 +126,85 @@ public:
     const vda5050_core::types::Visualization& visualization) override
   {
     dispatch(on_visualization_cb, "on_visualization", agv_id, visualization);
+  }
+
+  void on_node_reached(
+    const std::string& agv_id, const std::string& node_id) override
+  {
+    dispatch(on_node_reached_cb, "on_node_reached", agv_id, node_id);
+  }
+
+  void on_errors_appeared(
+    const std::string& agv_id,
+    const std::vector<vda5050_core::types::Error>& new_errors) override
+  {
+    dispatch(on_errors_appeared_cb, "on_errors_appeared", agv_id, new_errors);
+  }
+
+  void on_errors_resolved(
+    const std::string& agv_id,
+    const std::vector<vda5050_core::types::Error>& resolved_errors) override
+  {
+    dispatch(
+      on_errors_resolved_cb, "on_errors_resolved", agv_id, resolved_errors);
+  }
+
+  void on_new_base_requested(const std::string& agv_id) override
+  {
+    dispatch(on_new_base_requested_cb, "on_new_base_requested", agv_id);
+  }
+
+  void on_mode_changed(
+    const std::string& agv_id, vda5050_core::types::OperatingMode new_mode,
+    vda5050_core::types::OperatingMode prev_mode) override
+  {
+    dispatch(
+      on_mode_changed_cb, "on_mode_changed", agv_id, new_mode, prev_mode);
+  }
+
+  void on_paused(const std::string& agv_id, bool paused) override
+  {
+    dispatch(on_paused_cb, "on_paused", agv_id, paused);
+  }
+
+  void on_driving(const std::string& agv_id, bool driving) override
+  {
+    dispatch(on_driving_cb, "on_driving", agv_id, driving);
+  }
+
+  void on_connect(const std::string& agv_id) override
+  {
+    dispatch(on_connect_cb, "on_connect", agv_id);
+  }
+
+  void on_offline(const std::string& agv_id) override
+  {
+    dispatch(on_offline_cb, "on_offline", agv_id);
+  }
+
+  void on_connection_broken(const std::string& agv_id) override
+  {
+    dispatch(on_connection_broken_cb, "on_connection_broken", agv_id);
+  }
+
+  void on_state_timeout(const std::string& agv_id) override
+  {
+    dispatch(on_state_timeout_cb, "on_state_timeout", agv_id);
+  }
+
+  void on_state_resumed(const std::string& agv_id) override
+  {
+    dispatch(on_state_resumed_cb, "on_state_resumed", agv_id);
+  }
+
+  void on_broker_disconnected() override
+  {
+    dispatch(on_broker_disconnected_cb, "on_broker_disconnected");
+  }
+
+  void on_broker_reconnected() override
+  {
+    dispatch(on_broker_reconnected_cb, "on_broker_reconnected");
   }
 
 private:

@@ -53,6 +53,24 @@ PYBIND11_MODULE(vda5050_master_python, m)
     .def_readwrite("on_state", &pym::PyMaster::on_state_cb)
     .def_readwrite("on_connection", &pym::PyMaster::on_connection_cb)
     .def_readwrite("on_visualization", &pym::PyMaster::on_visualization_cb)
+    .def_readwrite("on_node_reached", &pym::PyMaster::on_node_reached_cb)
+    .def_readwrite("on_errors_appeared", &pym::PyMaster::on_errors_appeared_cb)
+    .def_readwrite("on_errors_resolved", &pym::PyMaster::on_errors_resolved_cb)
+    .def_readwrite(
+      "on_new_base_requested", &pym::PyMaster::on_new_base_requested_cb)
+    .def_readwrite("on_mode_changed", &pym::PyMaster::on_mode_changed_cb)
+    .def_readwrite("on_paused", &pym::PyMaster::on_paused_cb)
+    .def_readwrite("on_driving", &pym::PyMaster::on_driving_cb)
+    .def_readwrite("on_connect", &pym::PyMaster::on_connect_cb)
+    .def_readwrite("on_offline", &pym::PyMaster::on_offline_cb)
+    .def_readwrite(
+      "on_connection_broken", &pym::PyMaster::on_connection_broken_cb)
+    .def_readwrite("on_state_timeout", &pym::PyMaster::on_state_timeout_cb)
+    .def_readwrite("on_state_resumed", &pym::PyMaster::on_state_resumed_cb)
+    .def_readwrite(
+      "on_broker_disconnected", &pym::PyMaster::on_broker_disconnected_cb)
+    .def_readwrite(
+      "on_broker_reconnected", &pym::PyMaster::on_broker_reconnected_cb)
     .def(
       "connect", &vm::VDA5050Master::connect,
       py::call_guard<py::gil_scoped_release>())
