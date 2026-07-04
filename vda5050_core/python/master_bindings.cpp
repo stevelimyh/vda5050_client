@@ -45,7 +45,8 @@ PYBIND11_MODULE(vda5050_master_python, m)
   auto m_master = m.def_submodule("master", "VDA5050 fleet master API");
   vda5050_core::python::register_master(m_master);
 
-  py::class_<pym::PyMaster, std::shared_ptr<pym::PyMaster>>(m_master, "Master")
+  py::class_<pym::PyMaster, std::shared_ptr<pym::PyMaster>>(
+    m_master, "Master", py::module_local())
     .def(
       py::init(&pym::PyMaster::create), py::arg("broker_address"),
       py::arg("client_id"))
