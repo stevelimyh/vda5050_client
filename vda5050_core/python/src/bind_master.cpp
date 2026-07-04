@@ -146,11 +146,11 @@ void register_master(py::module_& m)
       "pending_stitch_count",
       &master::AGV::OrderStatusBundle::pending_stitch_count);
 
-  // factsheet field deferred until the Factsheet type is bound.
   py::class_<master::AGV::StatusSnapshot>(
     m, "StatusSnapshot", py::module_local())
     .def_readonly("state", &master::AGV::StatusSnapshot::state)
     .def_readonly("connection", &master::AGV::StatusSnapshot::connection)
+    .def_readonly("factsheet", &master::AGV::StatusSnapshot::factsheet)
     .def_readonly(
       "state_received_at", &master::AGV::StatusSnapshot::state_received_at)
     .def_readonly(

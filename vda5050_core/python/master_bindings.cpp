@@ -41,6 +41,7 @@ PYBIND11_MODULE(vda5050_master_python, m)
 
   auto m_types = m.def_submodule("types", "VDA5050 message types and enums");
   vda5050_core::python::register_types(m_types);
+  vda5050_core::python::register_factsheet(m_types);
 
   auto m_master = m.def_submodule("master", "VDA5050 fleet master API");
   vda5050_core::python::register_master(m_master);
@@ -53,6 +54,7 @@ PYBIND11_MODULE(vda5050_master_python, m)
     .def_readwrite("on_state", &pym::PyMaster::on_state_cb)
     .def_readwrite("on_connection", &pym::PyMaster::on_connection_cb)
     .def_readwrite("on_visualization", &pym::PyMaster::on_visualization_cb)
+    .def_readwrite("on_factsheet", &pym::PyMaster::on_factsheet_cb)
     .def_readwrite("on_node_reached", &pym::PyMaster::on_node_reached_cb)
     .def_readwrite("on_errors_appeared", &pym::PyMaster::on_errors_appeared_cb)
     .def_readwrite("on_errors_resolved", &pym::PyMaster::on_errors_resolved_cb)

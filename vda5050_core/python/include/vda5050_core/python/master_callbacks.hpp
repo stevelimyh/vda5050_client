@@ -33,6 +33,7 @@
 #include "vda5050_core/transport/paho_mqtt_client.hpp"
 #include "vda5050_core/types/connection.hpp"
 #include "vda5050_core/types/error.hpp"
+#include "vda5050_core/types/factsheet.hpp"
 #include "vda5050_core/types/load.hpp"
 #include "vda5050_core/types/operating_mode.hpp"
 #include "vda5050_core/types/state.hpp"
@@ -59,6 +60,8 @@ public:
     const std::string&, const vda5050_core::types::Connection&)>;
   using VisualizationCb = std::function<void(
     const std::string&, const vda5050_core::types::Visualization&)>;
+  using FactsheetCb = std::function<void(
+    const std::string&, const vda5050_core::types::Factsheet&)>;
   using AgvIdCb = std::function<void(const std::string&)>;
   using NodeReachedCb =
     std::function<void(const std::string&, const std::string&)>;
@@ -96,6 +99,7 @@ public:
   StateCb on_state_cb;
   ConnectionCb on_connection_cb;
   VisualizationCb on_visualization_cb;
+  FactsheetCb on_factsheet_cb;
   NodeReachedCb on_node_reached_cb;
   ErrorsCb on_errors_appeared_cb;
   ErrorsCb on_errors_resolved_cb;
@@ -130,6 +134,13 @@ public:
     const vda5050_core::types::Visualization& visualization) override
   {
     dispatch(on_visualization_cb, "on_visualization", agv_id, visualization);
+  }
+
+  void on_factsheet(
+    const std::string& agv_id,
+    const vda5050_core::types::Factsheet& factsheet) override
+  {
+    dispatch(on_factsheet_cb, "on_factsheet", agv_id, factsheet);
   }
 
   void on_node_reached(
