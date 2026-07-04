@@ -33,6 +33,7 @@
 #include "vda5050_core/transport/paho_mqtt_client.hpp"
 #include "vda5050_core/types/connection.hpp"
 #include "vda5050_core/types/error.hpp"
+#include "vda5050_core/types/load.hpp"
 #include "vda5050_core/types/operating_mode.hpp"
 #include "vda5050_core/types/state.hpp"
 #include "vda5050_core/types/visualization.hpp"
@@ -68,6 +69,8 @@ public:
     vda5050_core::types::OperatingMode)>;
   using BoolFlagCb = std::function<void(const std::string&, bool)>;
   using BrokerCb = std::function<void()>;
+  using LoadsCb = std::function<void(
+    const std::string&, const std::vector<vda5050_core::types::Load>&)>;
 
   explicit PyMaster(
     std::shared_ptr<vda5050_core::transport::MqttClientInterface> mqtt_client)
@@ -107,6 +110,7 @@ public:
   AgvIdCb on_state_resumed_cb;
   BrokerCb on_broker_disconnected_cb;
   BrokerCb on_broker_reconnected_cb;
+  LoadsCb on_loads_changed_cb;
 
   void on_state(
     const std::string& agv_id, const vda5050_core::types::State& state) override
@@ -205,6 +209,13 @@ public:
   void on_broker_reconnected() override
   {
     dispatch(on_broker_reconnected_cb, "on_broker_reconnected");
+  }
+
+  void on_loads_changed(
+    const std::string& agv_id,
+    const std::vector<vda5050_core::types::Load>& loads) override
+  {
+    dispatch(on_loads_changed_cb, "on_loads_changed", agv_id, loads);
   }
 
 private:

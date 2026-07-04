@@ -28,6 +28,7 @@
 #include "vda5050_core/types/agv_position.hpp"
 #include "vda5050_core/types/battery_state.hpp"
 #include "vda5050_core/types/blocking_type.hpp"
+#include "vda5050_core/types/bounding_box_reference.hpp"
 #include "vda5050_core/types/connection.hpp"
 #include "vda5050_core/types/connection_state.hpp"
 #include "vda5050_core/types/e_stop.hpp"
@@ -41,6 +42,8 @@
 #include "vda5050_core/types/info_level.hpp"
 #include "vda5050_core/types/info_reference.hpp"
 #include "vda5050_core/types/instant_actions.hpp"
+#include "vda5050_core/types/load.hpp"
+#include "vda5050_core/types/load_dimensions.hpp"
 #include "vda5050_core/types/node.hpp"
 #include "vda5050_core/types/node_position.hpp"
 #include "vda5050_core/types/node_state.hpp"
@@ -218,6 +221,36 @@ void register_types(py::module_& m)
     .def("__eq__", &types::EdgeState::operator==)
     .def("__ne__", &types::EdgeState::operator!=);
 
+  py::class_<types::BoundingBoxReference>(
+    m, "BoundingBoxReference", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("x", &types::BoundingBoxReference::x)
+    .def_readwrite("y", &types::BoundingBoxReference::y)
+    .def_readwrite("z", &types::BoundingBoxReference::z)
+    .def_readwrite("theta", &types::BoundingBoxReference::theta)
+    .def("__eq__", &types::BoundingBoxReference::operator==)
+    .def("__ne__", &types::BoundingBoxReference::operator!=);
+
+  py::class_<types::LoadDimensions>(m, "LoadDimensions", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("length", &types::LoadDimensions::length)
+    .def_readwrite("width", &types::LoadDimensions::width)
+    .def_readwrite("height", &types::LoadDimensions::height)
+    .def("__eq__", &types::LoadDimensions::operator==)
+    .def("__ne__", &types::LoadDimensions::operator!=);
+
+  py::class_<types::Load>(m, "Load", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("load_id", &types::Load::load_id)
+    .def_readwrite("load_type", &types::Load::load_type)
+    .def_readwrite("load_position", &types::Load::load_position)
+    .def_readwrite(
+      "bounding_box_reference", &types::Load::bounding_box_reference)
+    .def_readwrite("load_dimensions", &types::Load::load_dimensions)
+    .def_readwrite("weight", &types::Load::weight)
+    .def("__eq__", &types::Load::operator==)
+    .def("__ne__", &types::Load::operator!=);
+
   py::class_<types::State>(m, "State", py::module_local())
     .def(py::init<>())
     .def_readwrite("header", &types::State::header)
@@ -231,6 +264,7 @@ void register_types(py::module_& m)
     .def_readwrite("edge_states", &types::State::edge_states)
     .def_readwrite("agv_position", &types::State::agv_position)
     .def_readwrite("velocity", &types::State::velocity)
+    .def_readwrite("loads", &types::State::loads)
     .def_readwrite("driving", &types::State::driving)
     .def_readwrite("paused", &types::State::paused)
     .def_readwrite("new_base_request", &types::State::new_base_request)

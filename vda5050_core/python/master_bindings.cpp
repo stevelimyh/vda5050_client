@@ -71,6 +71,7 @@ PYBIND11_MODULE(vda5050_master_python, m)
       "on_broker_disconnected", &pym::PyMaster::on_broker_disconnected_cb)
     .def_readwrite(
       "on_broker_reconnected", &pym::PyMaster::on_broker_reconnected_cb)
+    .def_readwrite("on_loads_changed", &pym::PyMaster::on_loads_changed_cb)
     .def(
       "connect", &vm::VDA5050Master::connect,
       py::call_guard<py::gil_scoped_release>())
