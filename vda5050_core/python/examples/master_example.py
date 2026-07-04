@@ -20,6 +20,12 @@ Connects to an MQTT broker, onboards an AGV, prints incoming state/connection,
 and assigns a one-node order. Run against a running mosquitto broker:
 
     python3 master_example.py
+
+Notes:
+    - Do not capture ``master`` (or an AGV handle) inside a callback: it forms a
+      reference cycle Python's GC cannot collect. Use the ``agv_id`` argument and
+      ``master.get_agv(...)`` instead.
+    - AGV handles from ``get_agv()`` are valid only while the master is alive.
 """
 
 import time

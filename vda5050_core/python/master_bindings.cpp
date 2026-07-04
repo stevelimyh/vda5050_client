@@ -52,7 +52,6 @@ PYBIND11_MODULE(vda5050_master_python, m)
       py::arg("client_id"))
     .def_readwrite("on_state", &pym::PyMaster::on_state_cb)
     .def_readwrite("on_connection", &pym::PyMaster::on_connection_cb)
-    .def_readwrite("on_factsheet", &pym::PyMaster::on_factsheet_cb)
     .def_readwrite("on_visualization", &pym::PyMaster::on_visualization_cb)
     .def(
       "connect", &vm::VDA5050Master::connect,

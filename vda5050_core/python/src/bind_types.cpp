@@ -49,6 +49,7 @@
 #include "vda5050_core/types/safety_state.hpp"
 #include "vda5050_core/types/state.hpp"
 #include "vda5050_core/types/velocity.hpp"
+#include "vda5050_core/types/visualization.hpp"
 
 namespace py = pybind11;
 
@@ -250,6 +251,14 @@ void register_types(py::module_& m)
     .def_readwrite("connection_state", &types::Connection::connection_state)
     .def("__eq__", &types::Connection::operator==)
     .def("__ne__", &types::Connection::operator!=);
+
+  py::class_<types::Visualization>(m, "Visualization", py::module_local())
+    .def(py::init<>())
+    .def_readwrite("header", &types::Visualization::header)
+    .def_readwrite("agv_position", &types::Visualization::agv_position)
+    .def_readwrite("velocity", &types::Visualization::velocity)
+    .def("__eq__", &types::Visualization::operator==)
+    .def("__ne__", &types::Visualization::operator!=);
 
   py::enum_<types::BlockingType>(m, "BlockingType", py::module_local())
     .value("NONE", types::BlockingType::NONE)

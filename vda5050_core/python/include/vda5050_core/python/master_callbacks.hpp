@@ -21,6 +21,7 @@
 
 #include <pybind11/pybind11.h>
 
+#include <exception>
 #include <functional>
 #include <memory>
 #include <string>
@@ -30,7 +31,6 @@
 #include "vda5050_core/master/master.hpp"
 #include "vda5050_core/transport/paho_mqtt_client.hpp"
 #include "vda5050_core/types/connection.hpp"
-#include "vda5050_core/types/factsheet.hpp"
 #include "vda5050_core/types/state.hpp"
 #include "vda5050_core/types/visualization.hpp"
 
@@ -53,8 +53,6 @@ public:
     std::function<void(const std::string&, const vda5050_core::types::State&)>;
   using ConnectionCb = std::function<void(
     const std::string&, const vda5050_core::types::Connection&)>;
-  using FactsheetCb = std::function<void(
-    const std::string&, const vda5050_core::types::Factsheet&)>;
   using VisualizationCb = std::function<void(
     const std::string&, const vda5050_core::types::Visualization&)>;
 
@@ -81,7 +79,6 @@ public:
 
   StateCb on_state_cb;
   ConnectionCb on_connection_cb;
-  FactsheetCb on_factsheet_cb;
   VisualizationCb on_visualization_cb;
 
   void on_state(
@@ -95,13 +92,6 @@ public:
     const vda5050_core::types::Connection& connection) override
   {
     dispatch(on_connection_cb, "on_connection", agv_id, connection);
-  }
-
-  void on_factsheet(
-    const std::string& agv_id,
-    const vda5050_core::types::Factsheet& factsheet) override
-  {
-    dispatch(on_factsheet_cb, "on_factsheet", agv_id, factsheet);
   }
 
   void on_visualization(
@@ -126,6 +116,10 @@ private:
     catch (pybind11::error_already_set& e)
     {
       VDA5050_ERROR("Python {} callback raised: {}", name, e.what());
+    }
+    catch (const std::exception& e)
+    {
+      VDA5050_ERROR("{} callback error: {}", name, e.what());
     }
   }
 };
