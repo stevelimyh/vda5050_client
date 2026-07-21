@@ -1,7 +1,8 @@
 # Master API Reference
 
-Every command you can call on `VDA5050Master`, and every event it can call you
-back on. For the guided walkthrough, start with [`master.md`](master.md).
+This document lists every command available on `VDA5050Master` and every
+callback it can invoke. For the guided walkthrough, start with
+[`master.md`](master.md).
 
 All examples assume:
 
@@ -46,7 +47,7 @@ master->connect();
 // Is the broker connection up right now?
 if (!master->is_connected()) { /* your code */ }
 
-// Connection detail, including how many times it has reconnected.
+// Connection detail, including the number of successful connections.
 auto status = master->get_broker_status();
 // status.connected, status.last_disconnect_at, status.reconnect_count
 
@@ -64,7 +65,8 @@ master->onboard_agv("Manufacturer", "S001");
 // With a custom interface name, queue size, and full-queue policy.
 master->onboard_agv("uagv", "Manufacturer", "S001", 10, true);
 
-// A whole roster at once, under one lock.
+// A whole roster at once, under one lock. OnboardSpec has no interface field
+// — batch onboarding always uses the default interface name, "uagv".
 std::vector<VDA5050Master::OnboardSpec> specs = {
   {"Manufacturer", "S001", 10, true},
   {"Manufacturer", "S002", 10, true},
@@ -98,7 +100,8 @@ if (agv)
 ### Sending work
 
 ```cpp
-// Validate and queue an order. Returns once queued, not once published.
+// Pre-flight and queue an order. For a newly accepted order this returns once
+// it is queued, not once it is published.
 auto res = master->assign_order("Manufacturer", "S001", order);
 if (res.decision != vda5050_core::master::OrderAssignmentDecision::ASSIGNED)
 {
@@ -115,9 +118,12 @@ ia.actions = {vda5050_core::master::ActionFactory::build_state_request(
 auto ia_res = master->assign_instant_actions("Manufacturer", "S001", ia);
 ```
 
-`publish_order` and `publish_instant_actions` take the same arguments but skip
-validation and header filling, returning only `bool`. The caller owns
-correctness — prefer the `assign_*` pair.
+`publish_order` and `publish_instant_actions` are lower-level escape hatches.
+They take the same arguments but skip the synchronous pre-flight checks,
+returning only `bool` — `false` means the AGV is not onboarded or the queue
+rejected the message, with no way to tell which. The outbound worker still
+fills the header and runs its publish-stage checks. Prefer the `assign_*` pair
+unless you intentionally want to bypass the pre-flight.
 
 See [what the master validates](master.md#4-what-the-master-validates) for the
 order of the checks and which rejections reach the caller.
@@ -167,7 +173,7 @@ auto cache = master->get_alignment_cache_snapshot();
 
 ## Types
 
-The vocabulary the commands above trade in.
+The result and state types used by the commands above.
 
 ### `OrderAssignmentDecision`
 
@@ -179,7 +185,7 @@ false while carrying no errors.
 | --- | --- | --- |
 | `ASSIGNED` | queued for publish | carry on |
 | `STITCH_QUEUED` | update held until the AGV confirms the previous one; publishes itself later | nothing — not a failure |
-| `DUPLICATE_IGNORED` | same `order_update_id` already applied | nothing — not a failure |
+| `DUPLICATE_IGNORED` | the same `order_update_id` has already been applied | nothing — not a failure |
 | `AGV_NO_STATE_YET` | no State received from the AGV yet | retry later |
 | `AGV_NOT_READY` | operational state is `ERROR` / `UNAVAILABLE` / `STATE_UNKNOWN` | retry later |
 | `AGV_OFFLINE` | connection is not `ONLINE` | retry on reconnect |
@@ -210,7 +216,7 @@ Returned by `assign_instant_actions`.
 | `AGV_NOT_ONBOARDED` | no AGV with that manufacturer/serial |
 | `AGV_OFFLINE` | connection is not `ONLINE` |
 | `AGV_QUEUE_FULL` | outbound queue is full |
-| `INVALID_CONTENT` | failed schema validation, or the message has no actions |
+| `INVALID_CONTENT` | failed content validation, or the message has no actions |
 | `DUPLICATE_ACTION_ID` | an `action_id` collides with one in flight, in the active order, queued, or repeated in the message |
 | `AGV_MODE_NOT_AUTO_FOR_ACTION` | AGV is not under master control and the action type is not exempt |
 | `AGV_CANNOT_PERFORM_ACTION` | action type is not in the AGV's factsheet |
@@ -220,7 +226,13 @@ Returned by `assign_instant_actions`.
 
 `InstantActionAssignmentResult` has the same shape as
 `OrderAssignmentResult` — `decision`, `errors`, and an `ASSIGNED`-only
-`operator bool`.
+`operator bool`. Only fatal findings reach `errors`; warnings are dropped.
+
+> When no factsheet has been received, the capability and protocol-limit checks
+> are skipped rather than run, so `ASSIGNED` is not proof that
+> `AGV_CANNOT_PERFORM_ACTION` or `EXCEEDS_PROTOCOL_LIMITS` were ruled out. The
+> skipped check is recorded as a warning, but the assignment result discards
+> warnings. Request a factsheet on connect if you depend on either check.
 
 ### `AGVState`
 
@@ -241,7 +253,7 @@ From `get_broker_status()`.
 | --- | --- |
 | `connected` | broker connection state |
 | `last_disconnect_at` | `std::optional<system_clock::time_point>`; unset if never dropped |
-| `reconnect_count` | `1` after the first connect, incremented on each reconnect |
+| `reconnect_count` | successful broker connections, including the initial one |
 
 ### `OnboardSpec` and `BatchOnboardResult`
 
@@ -251,7 +263,7 @@ For `onboard_agv_batch`.
 | --- | --- |
 | `manufacturer`, `serial_number` | the AGV's identity |
 | `max_queue_size` | outbound queue cap (default 10) |
-| `drop_oldest` | on a full queue, drop the oldest rather than reject the new one |
+| `drop_oldest` | when the queue is full, drop the oldest item instead of rejecting the new one |
 
 `BatchOnboardResult` splits the input into `onboarded`,
 `skipped_already_onboarded`, and `failed` (empty manufacturer or serial).
@@ -262,7 +274,7 @@ From `agv->get_pose_view()`, the freshest pose across State and Visualization.
 
 | Member | Holds |
 | --- | --- |
-| `source` | `None`, `State`, or `Visualization` |
+| `source` | `None`, `State`, `Visualization`, or `Extrapolated` (reserved; not currently set) |
 | `agv_position`, `velocity` | optional; empty when `source == None` |
 | `driving` | whether the AGV reports itself moving |
 | `data_age` | how long since the underlying message arrived |
@@ -273,8 +285,9 @@ unknown rather than stale.
 ## Callbacks
 
 Register all of these **before** `connect()`. Each event has one slot —
-registering twice replaces the first. They all run on the same inbound thread,
-so keep them prompt.
+registering twice replaces the first. In the current implementation they are
+invoked synchronously from the inbound message-processing path, so keep them
+prompt and thread-safe.
 
 ### Messages
 
@@ -319,6 +332,10 @@ master->on_new_base_requested([&](const std::string& agv_id) {
   // your code: the AGV wants more base nodes; send an order update
 });
 ```
+
+There is currently no callback for an order rejected by the outbound worker.
+Those rejections appear in the log only, so completion-driven dispatch should
+carry a timeout rather than waiting on `on_order_complete` alone.
 
 ### Availability
 

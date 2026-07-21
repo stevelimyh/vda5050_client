@@ -10,9 +10,9 @@
 >
 > Constructing a master logs this same warning once.
 
-This guide explains how to build a master on top of
-`vda5050_core::master`. It is the counterpart to the client
-adapter ([`adapter.md`](adapter.md)): the adapter runs *on* a vehicle and
+This guide explains how to build a master on top of `vda5050_core::master`. It
+is the counterpart to the client adapter
+([`client-adapter.md`](client-adapter.md)): the adapter runs *on* a vehicle and
 answers orders; the master runs on the fleet-control host and *issues* them.
 
 Two companion documents: [`master-api.md`](master-api.md) is the reference for
@@ -212,17 +212,17 @@ The pre-flight gate stops it and tells you why:
 [WARN]: rejected: AGV position is not initialized
 ```
 
-[`master-api.md`](master-api.md) has a call example for every command.
-[`master-api.md`](master-api.md) lists every decision value and what to do
-about it; [`validation.md`](validation.md) explains each check.
+[`master-api.md`](master-api.md) contains examples for every command and
+documents each decision value; [`validation.md`](validation.md) explains the
+individual checks.
 
 ## 3. Create Your Own Master
 
 Copy `master_example.cpp` into your own package and rebuild it around your own
 logic. The result is one half of the system: your master issues orders, and
 each vehicle needs a VDA5050 client on the other end — either the client
-adapter in this library (see [`adapter.md`](adapter.md)) or the vendor's own
-VDA5050 implementation.
+adapter in this library (see [`client-adapter.md`](client-adapter.md)) or the
+vendor's own VDA5050 implementation.
 
 The demo dispatch — `make_order`, `make_node`, `next_order`, the `orders_sent`
 / `first_order_sent` counters, and the `kAutoDispatch` / `kMaxOrders` constants
@@ -276,9 +276,10 @@ master->connect();
 master->onboard_agv("uagv", "Manufacturer", "S001");
 ```
 
-Register callbacks **before** `connect()`. They fire on the inbound MQTT thread,
-so keep them prompt and thread-safe; a slow callback delays every other AGV's
-messages.
+Register callbacks **before** `connect()`. In the current implementation they
+are invoked synchronously from the inbound message-processing path, so keep
+them prompt and thread-safe — a slow callback may delay processing for other
+AGVs.
 
 What you can react to:
 
@@ -367,9 +368,9 @@ and edge direction checks:
 ```
 
 If the load fails, the master logs the error and keeps running **without** a
-layout — the graph stays unset and every layout check is skipped. Orders still
-publish, with node ids unvalidated. Handle the failure if that is not what you
-want.
+layout — the graph stays unset. Orders may still be published, but
+layout-based node and edge checks are skipped. Handle the failure if that is
+not what you want.
 
 `examples/master/sample_layout.json` is a minimal LIF file to try this with. It
 defines `N0` and `N1` on map `map_1` with an edge between them — the same nodes
@@ -403,7 +404,7 @@ Replace it with orders from your task source. The rules that matter:
 - `order_id` must be unique per order; reusing one is treated as an update
 - nodes take even `sequence_id`s, edges the odd ones between them
 - `released: true` means the AGV may drive it; unreleased nodes are the horizon
-- the header is filled in for you by `assign_order`
+- the master fills the VDA5050 header before publishing
 
 Assign with `assign_order`, and check the decision — it returns `ASSIGNED` only
 when the order was accepted for sending:
@@ -420,13 +421,15 @@ if (res.decision != OrderAssignmentDecision::ASSIGNED)
 ```
 
 A rejection here is **returned, not logged** — the master stays quiet because
-only you know whether one matters. Ignore the result and the order is gone
-without a trace.
+only you know whether one matters. If the result is ignored, the caller
+receives no other notification of that rejection.
 
-`assign_order` returns once the order is **queued**. Deeper validation runs on
-the AGV's worker thread afterwards, and those rejections are the other way
-round: logged, not returned, because there is no caller left to tell.
-[Section 4](#4-what-the-master-validates) covers both stages.
+For a newly accepted order, `assign_order` returns once it has been
+**queued**. Deeper validation runs on the AGV's worker thread afterwards, and
+those rejections are the other way round: logged, not returned, because there
+is no caller left to tell. [Section 4](#4-what-the-master-validates) covers
+both stages, and [`master-api.md`](master-api.md) lists every
+`OrderAssignmentDecision` value.
 
 To extend an order the AGV is already running, send another order with the same
 `order_id` and a higher `order_update_id`. The master merges it at the stitch
@@ -577,10 +580,9 @@ int main()
 Three things change with more than one vehicle:
 
 - **Per-AGV state must be a map**, keyed by `agv_id`
-- **Callbacks are shared** — one handler receives every AGV, so branch on
-  `agv_id` rather than registering per robot
-- **Callbacks run on one thread** for all AGVs, so a slow handler delays the
-  whole fleet
+- **Callbacks are shared** — one registered handler receives events for every
+  AGV, identified by `agv_id`, so branch on it rather than registering per robot
+- **Keep handlers prompt** — a slow one may delay processing for other AGVs
 
 `get_onboarded_agvs()` returns every `{manufacturer, serial}` currently
 onboarded. `get_agv()` returns a read-only view of one vehicle's cached state.
@@ -604,9 +606,10 @@ target_link_libraries(my_master
 
 ## 4. What the Master Validates
 
-The master checks every order and instant action before it goes on the wire, so
-you do not have to. This section is what those checks are and, more usefully,
-which failures come back to you and which only reach the log.
+The master runs its order and instant-action checks before publishing. Your
+application may still apply its own business or scheduling rules before calling
+it. This section is what those checks are and, more usefully, which failures
+come back to you and which only reach the log.
 [`validation.md`](validation.md) describes the individual validators.
 
 Not every step is a validator. Several are inline gates on AGV or broker state.
@@ -614,9 +617,9 @@ The **Source** column says which is which.
 
 ### Orders
 
-`assign_order()` returns once the order is **queued**. The rest of the chain
-runs afterwards on the AGV's outbound worker, and those rejections are
-**logged, not returned**.
+For a newly accepted order, `assign_order()` returns once it has been
+**queued**. The rest of the chain runs afterwards on the AGV's outbound
+worker, and those rejections are **logged, not returned**.
 
 Checked before `assign_order()` returns:
 
@@ -682,8 +685,9 @@ reusing an `action_id` that is still running is rejected.
 ### Reading a rejection
 
 Check `decision` first. `operator bool` is `true` only for `ASSIGNED`, so a
-`STITCH_QUEUED` or `DUPLICATE_IGNORED` outcome tests false while carrying no
-errors at all — the order was accepted, just not sent yet.
+`STITCH_QUEUED` or `DUPLICATE_IGNORED` outcome tests false. These are
+non-assignment outcomes rather than validation failures, and may carry no
+errors.
 
 ```cpp
 auto res = master->assign_order(manufacturer, serial, order);
@@ -721,8 +725,10 @@ Bring it up in stages:
    `on_node_reached` fire as it drives.
 4. **Add the rest of the fleet.**
 
-If an order is rejected, the decision value names the failing check.
-[Section 4](#4-what-the-master-validates) maps each one to what it means.
+If an order is rejected before queuing, the decision value identifies the
+reason. Rejections produced later by the outbound worker appear in the log.
+[Section 4](#4-what-the-master-validates) maps the pre-queue decisions and the
+worker-stage checks to their meaning.
 
 Run with `DEBUG` logging to see the queue and heartbeat internals:
 
