@@ -1,10 +1,8 @@
 # Validation
 
-This document describes the validators in `vda5050_core::validation` and how
-the master composes them when publishing orders and instant actions.
-
-For building a master, start with [`master.md`](master.md);
-[`master-api.md`](master-api.md) is the command and callback reference.
+This is the reference for `vda5050_core::validation`: what each validator
+checks, what data it needs, and how to read the result. It applies to both
+sides of the protocol.
 
 ## 1. Overview
 
@@ -14,16 +12,24 @@ concurrently, and each one is usable on its own.
 
 Findings come at two levels:
 
-- **Fatal** — the caller treats the message as rejected.
-- **Warning** — advisory. The message is still published.
+- **Fatal** — makes the result evaluate to `false`. The caller would normally
+  reject the message.
+- **Warning** — advisory. It does not affect that, and what to do about it is
+  up to the caller.
 
 ```cpp
 #include "vda5050_core/validation/content_validator.hpp"
 
-auto result = vda5050_core::validation::validate_order_content(order);
+const auto result = vda5050_core::validation::validate_order_content(order);
+
 if (!result)
 {
-  // fatal errors only; warnings do not set this
+  // at least one fatal finding
+}
+
+if (result.has_warnings())
+{
+  // advisory findings; inspect the entries for details
 }
 ```
 
@@ -31,19 +37,21 @@ if (!result)
 
 | Member | Returns |
 | --- | --- |
-| `add_error(error)` | files an entry by level |
-| `fatal_errors()` | entries that block publishing |
+| `add_error(error)` | adds an entry according to its error level |
+| `fatal_errors()` | entries classified as fatal |
 | `warnings()` | advisory entries |
 | `has_fatal()` | `true` if any fatal entry |
 | `has_warnings()` | `true` if any warning entry |
 | `operator bool` | `true` when there are **no fatal** entries |
 
 Each entry is a `types::Error` carrying an error type and level; the description
-and field references are optional.
+and field references are optional. There is no merge operation, so a caller
+running several validators decides how to combine the results.
 
 > **`operator bool` ignores warnings.** `if (result)` is `true` for a result
-> holding warnings and no fatal errors. Test `has_warnings()` when you need to
-> know whether a check actually ran.
+> holding warnings and no fatal errors. `has_warnings()` only tells you some
+> warning exists — read `warnings()` and check the entry's type to tell a
+> skipped check from a completed one.
 
 ## 3. The validators
 
@@ -51,9 +59,9 @@ One header per concern, in `include/vda5050_core/validation/`.
 
 ### `content_validator.hpp`
 
-Required-content checks per message type: header version, manufacturer and
-serial non-empty, ids non-empty, and every action carrying an `action_id` and
-`action_type`.
+Required-content checks per message type: supported header version, non-empty
+manufacturer and serial number, non-empty identifiers, and every action
+carrying an `action_id` and `action_type`.
 
 | Function | Validates |
 | --- | --- |
@@ -64,8 +72,8 @@ serial non-empty, ids non-empty, and every action carrying an `action_id` and
 | `validate_factsheet_content` | Factsheet |
 | `validate_visualization_content` | Visualization |
 
-All findings are fatal. These are the only checks that need nothing but the
-message itself.
+All findings are fatal. These need only the message, with no cached AGV state,
+factsheet, or loaded layout.
 
 ### `pre_send_validator.hpp`
 
@@ -81,6 +89,9 @@ loaded graph) and fails, fatally, when the AGV:
 - has its e-stop engaged
 - reports no position, or `positionInitialized: false`
 
+The traversability, capability, and protocol-limit checks read the same
+`PreSendContext`, so it is built once and passed to each.
+
 ### `order_graph_validator.hpp`
 
 `is_valid_graph` checks that an order's nodes and edges form a valid graph:
@@ -90,17 +101,12 @@ sequence numbering, node/edge alternation, released-versus-horizon consistency.
 order it extends: same `orderId`, a newer `orderUpdateId`, and a first node
 that matches the base's decision point.
 
-Both are fatal throughout, so `operator bool` is enough to gate on.
+Both produce only fatal findings, so `operator bool` is enough to gate on.
 
-> The `\note` on `is_valid_graph` in the header still describes these findings
-> as advisory `WARNING` level and tells you to gate on
-> `has_fatal() || has_warnings()`. That is out of date — every finding from
-> both functions is `FATAL`.
-
-The two functions suit different callers. `is_valid_update` needs both orders
-in full, which only a client holds: the master merges the update and runs
-`is_valid_graph` on the merged order instead, validating what it actually
-sends.
+The two suit different callers. `is_valid_update` needs both orders in full, so
+it fits a receiver holding the order it is about to extend. A sender that
+combines the two itself can skip it and run `is_valid_graph` on the combined
+order, which validates what actually goes on the wire.
 
 ### `traversability_validator.hpp`
 
@@ -118,7 +124,8 @@ action type supported, required scope, blocking type, declared and required
 parameters. Overloads exist for Order and InstantActions; only the
 InstantActions overload exempts the predefined action types.
 
-Fatal, but it needs a factsheet — see *Checks that may not run*.
+Fatal, but it needs a factsheet — see
+[checks that may be skipped](#4-checks-that-may-be-skipped).
 
 ### `protocol_limits_validator.hpp`
 
@@ -127,16 +134,19 @@ limits: `order_nodes` and `order_edges` for the route, `node_actions` and
 `edge_actions` per element, `actions_actions_parameters` per action, and
 `instant_actions` per message. Overloads exist for Order and InstantActions.
 
-Fatal, but it needs a factsheet — see *Checks that may not run*. The array
-limits are per-order, so on a stitch the subject is the merged order, not the
-update fragment.
+Fatal, but it needs a factsheet — see
+[checks that may be skipped](#4-checks-that-may-be-skipped). The limits are
+per-order, so when an order is built by stitching an update onto a base, the
+subject is the combined order rather than the update alone.
 
 ### `instant_action_mode_validator.hpp`
 
-`validate_instant_action_mode` gates instant actions on the operating mode.
-While the master is in control — `AUTOMATIC` or `SEMIAUTOMATIC` — everything
-passes. Otherwise, and when no State has been received, only exempt action types
-get through. `is_mode_exempt_action_type` reports which.
+`validate_instant_action_mode` gates instant actions on the AGV's operating
+mode. In `AUTOMATIC` or `SEMIAUTOMATIC` everything passes. In any other mode,
+or when no State has been received, only exempt action types get through.
+`is_mode_exempt_action_type` reports which.
+
+All findings are fatal.
 
 ### `action_conflict_validator.hpp`
 
@@ -151,13 +161,14 @@ actions and driving state:
 
 Two exceptions: `initPosition` is rejected while driving whatever its blocking
 type, and `cancelOrder` / `startPause` / `stopPause` bypass the check entirely.
-With no cached State the whole check passes.
+
+Fatal. With no cached State the whole check passes.
 
 ### `factsheet_alignment.hpp`
 
 `check_factsheet_alignment` compares the loaded layout's edge speeds against the
 AGV factsheet's speed envelope. **Warning** level throughout — it is a
-diagnostic, not a gate. The master runs it when a factsheet arrives.
+diagnostic to run once a factsheet is available, not a gate on any message.
 
 ### `operating_mode_control.hpp` and `predefined_action_types.hpp`
 
@@ -171,7 +182,7 @@ Helpers that answer a question rather than validate:
 | `is_motion_exempt_action_type(type)` | action may be issued mid-motion |
 | `is_position_init_action_type(type)` | action rewrites the pose |
 
-### Checks that may not run
+## 4. Checks that may be skipped
 
 Three checks need data that may not have arrived:
 
@@ -185,31 +196,6 @@ When the data is missing the check does not run and a warning records that.
 Since warnings do not set `operator bool`, a result with no fatal errors is not
 proof the check ran. Request a factsheet on connect if you rely on either
 factsheet-gated check.
-
-## 4. Who uses what
-
-Every validator is usable on its own, but the two sides of the protocol reach
-for different ones. The master validates what it is about to **send**, so it
-uses the whole set. A client validates what it has **received**, which only
-needs the graph checks.
-
-| Validator | Master | Client |
-| --- | --- | --- |
-| `is_valid_graph` | yes | yes |
-| `is_valid_update` | no | yes |
-| `validate_*_content` | yes | no |
-| `validate_pre_send` | yes | no |
-| `validate_traversability` | yes | no |
-| `validate_capability` | yes | no |
-| `validate_protocol_limits` | yes | no |
-| `validate_instant_action_mode` | yes | no |
-| `validate_action_conflict` | yes | no |
-| `check_factsheet_alignment` | yes | no |
-
-The client-side checks the shared validators do **not** cover — is the vehicle
-busy, is this update a duplicate, does the stitch node match the decision
-point — are implemented by each client in its own acceptance logic rather than
-in `vda5050_core::validation`.
 
 ## 5. Error types
 
@@ -231,6 +217,3 @@ produced it.
 
 Most entries also carry field references identifying what failed, such as
 `RefOrderId`, `RefNodeId`, `RefSequenceId`, or `RefActionId`.
-
-For how the master chains these when publishing, and which rejections reach the
-caller, see [`master.md`](master.md).
