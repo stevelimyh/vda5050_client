@@ -599,8 +599,9 @@ find_package(vda5050_core REQUIRED)
 add_executable(my_master src/my_master.cpp)
 target_link_libraries(my_master
   PRIVATE
-    vda5050_core::vda5050_master
-    vda5050_core::vda5050_transport
+    vda5050_core::master
+    vda5050_core::transport
+    vda5050_core::logger
 )
 ```
 
