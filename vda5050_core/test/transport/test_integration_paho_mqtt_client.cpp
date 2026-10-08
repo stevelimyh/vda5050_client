@@ -18,12 +18,89 @@
 
 #include <gmock/gmock.h>
 
+#include <signal.h>
+#include <spawn.h>
+#include <sys/wait.h>
+
 #include <atomic>
 #include <chrono>
+#include <functional>
+#include <string>
 #include <thread>
 
 #include "vda5050_core/transport/mqtt_client_interface.hpp"
 #include "vda5050_core/transport/paho_mqtt_client.hpp"
+
+extern char** environ;
+
+namespace {
+
+constexpr int kRestartBrokerPort = 18883;
+constexpr auto kBrokerOutage = std::chrono::seconds(1);
+constexpr auto kDeadline = std::chrono::seconds(20);
+constexpr auto kPollInterval = std::chrono::milliseconds(50);
+
+// A broker owned by the test so it can be stopped and restarted.
+class BrokerProcess
+{
+public:
+  explicit BrokerProcess(int port) : port_(std::to_string(port)) {}
+
+  ~BrokerProcess()
+  {
+    stop();
+  }
+
+  BrokerProcess(const BrokerProcess&) = delete;
+  BrokerProcess& operator=(const BrokerProcess&) = delete;
+
+  bool start()
+  {
+    std::string program = "mosquitto";
+    std::string port_flag = "-p";
+    char* argv[] = {program.data(), port_flag.data(), port_.data(), nullptr};
+    return posix_spawnp(&pid_, "mosquitto", nullptr, nullptr, argv, environ) ==
+           0;
+  }
+
+  void stop()
+  {
+    if (pid_ <= 0) return;
+    kill(pid_, SIGTERM);
+    waitpid(pid_, nullptr, 0);
+    pid_ = 0;
+  }
+
+  std::string url() const
+  {
+    return "tcp://localhost:" + port_;
+  }
+
+private:
+  std::string port_;
+  pid_t pid_ = 0;
+};
+
+bool wait_until(const std::function<bool()>& condition)
+{
+  const auto deadline = std::chrono::steady_clock::now() + kDeadline;
+  while (std::chrono::steady_clock::now() < deadline)
+  {
+    if (condition()) return true;
+    std::this_thread::sleep_for(kPollInterval);
+  }
+  return condition();
+}
+
+bool connect_when_ready(vda5050_core::transport::PahoMqttClient& client)
+{
+  return wait_until([&client]() {
+    client.connect();
+    return client.connected();
+  });
+}
+
+}  // namespace
 
 TEST(PahoMqttClientTest, PublishSubscribe)
 {
@@ -138,4 +215,86 @@ TEST(PahoMqttClientTest, FailedConnectionRemainsDisconnected)
 
   // connected() should return false after failed connection
   ASSERT_FALSE(client->connected());
+}
+
+TEST(PahoMqttClientTest, ResubscribesAfterBrokerRestart)
+{
+  BrokerProcess broker(kRestartBrokerPort);
+  if (!broker.start()) GTEST_SKIP() << "mosquitto could not be started";
+
+  const std::string topic = "/test/integration/resubscribe";
+  std::atomic_int message_count{0};
+
+  auto listener = vda5050_core::transport::PahoMqttClient::make_unique(
+    broker.url(), "resubscribe_listener");
+  ASSERT_TRUE(connect_when_ready(*listener));
+  listener->subscribe(
+    topic, [&](const std::string&, const std::string&) { message_count++; }, 0);
+
+  auto talker = vda5050_core::transport::PahoMqttClient::make_unique(
+    broker.url(), "resubscribe_talker");
+  ASSERT_TRUE(connect_when_ready(*talker));
+  ASSERT_TRUE(wait_until([&]() {
+    talker->publish(topic, "before", 0);
+    return message_count.load() > 0;
+  }));
+
+  broker.stop();
+  std::this_thread::sleep_for(kBrokerOutage);
+  ASSERT_TRUE(broker.start());
+  ASSERT_TRUE(wait_until([&]() { return listener->connected(); }));
+  ASSERT_TRUE(wait_until([&]() { return talker->connected(); }));
+
+  const int received_before_restart = message_count.load();
+  EXPECT_TRUE(wait_until([&]() {
+    talker->publish(topic, "after", 0);
+    return message_count.load() > received_before_restart;
+  }));
+
+  talker->disconnect();
+  listener->disconnect();
+}
+
+TEST(PahoMqttClientTest, UnsubscribeWhileDisconnectedStaysUnsubscribed)
+{
+  BrokerProcess broker(kRestartBrokerPort);
+  if (!broker.start()) GTEST_SKIP() << "mosquitto could not be started";
+
+  const std::string kept_topic = "/test/integration/kept";
+  const std::string dropped_topic = "/test/integration/dropped";
+  std::atomic_int kept_count{0};
+  std::atomic_int dropped_count{0};
+
+  auto listener = vda5050_core::transport::PahoMqttClient::make_unique(
+    broker.url(), "unsubscribe_offline_listener");
+  ASSERT_TRUE(connect_when_ready(*listener));
+  listener->subscribe(
+    kept_topic, [&](const std::string&, const std::string&) { kept_count++; },
+    0);
+  listener->subscribe(
+    dropped_topic,
+    [&](const std::string&, const std::string&) { dropped_count++; }, 0);
+
+  broker.stop();
+  ASSERT_TRUE(wait_until([&]() { return !listener->connected(); }));
+  listener->unsubscribe(dropped_topic);
+
+  std::this_thread::sleep_for(kBrokerOutage);
+  ASSERT_TRUE(broker.start());
+  ASSERT_TRUE(wait_until([&]() { return listener->connected(); }));
+
+  auto talker = vda5050_core::transport::PahoMqttClient::make_unique(
+    broker.url(), "unsubscribe_offline_talker");
+  ASSERT_TRUE(connect_when_ready(*talker));
+
+  // Once kept arrives, re-subscribe is done, so dropped must not have arrived.
+  ASSERT_TRUE(wait_until([&]() {
+    talker->publish(dropped_topic, "dropped", 0);
+    talker->publish(kept_topic, "kept", 0);
+    return kept_count.load() > 0;
+  }));
+  EXPECT_EQ(dropped_count.load(), 0);
+
+  talker->disconnect();
+  listener->disconnect();
 }
