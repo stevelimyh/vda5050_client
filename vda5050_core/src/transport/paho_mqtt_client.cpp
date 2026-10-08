@@ -17,6 +17,10 @@
  */
 
 #include "vda5050_core/transport/paho_mqtt_client.hpp"
+
+#include <string>
+#include <vector>
+
 #include "vda5050_core/logger/logger.hpp"
 
 namespace vda5050_core {
@@ -58,6 +62,18 @@ void MqttActionListener::on_success(const mqtt::token& /*tok*/)
 }
 
 //=============================================================================
+void MqttResubscribeListener::on_failure(const mqtt::token& /*tok*/)
+{
+  VDA5050_ERROR("Re-subscribe after reconnect failed");
+}
+
+//=============================================================================
+void MqttResubscribeListener::on_success(const mqtt::token& /*tok*/)
+{
+  // Nothing to do here ...
+}
+
+//=============================================================================
 MqttCallback::MqttCallback(PahoMqttClient& parent) : parent_(parent)
 {
   // Nothing to do here ...
@@ -70,10 +86,34 @@ void MqttCallback::connected(const std::string& cause)
     "MQTT client [" << parent_.client_->get_client_id() << "] connected to "
                     << parent_.client_->get_server_uri());
   MqttClientInterface::ConnectionStateHandler handler;
+  std::vector<std::string> topics;
+  mqtt::iasync_client::qos_collection qos;
   {
     std::lock_guard<std::mutex> lock(parent_.handler_mutex_);
     handler = parent_.connected_handler_;
+    for (const auto& [topic, subscription] : parent_.handlers_)
+    {
+      topics.push_back(topic);
+      qos.push_back(subscription.qos);
+    }
   }
+
+  if (!topics.empty())
+  {
+    VDA5050_INFO("Re-subscribing {} topic(s) after reconnect", topics.size());
+    try
+    {
+      parent_.client_->subscribe(
+        mqtt::string_collection::create(topics), qos, nullptr,
+        parent_.resubscribe_listener_);
+    }
+    catch (const mqtt::exception& e)
+    {
+      VDA5050_ERROR_STREAM(
+        "Re-subscribe after reconnect failed: " << e.get_message());
+    }
+  }
+
   if (handler) handler(cause);
 }
 
@@ -96,7 +136,7 @@ void MqttCallback::message_arrived(mqtt::const_message_ptr msg)
   auto it = parent_.handlers_.find(msg->get_topic());
   if (it != parent_.handlers_.end())
   {
-    it->second(msg->get_topic(), msg->get_payload());
+    it->second.handler(msg->get_topic(), msg->get_payload());
   }
 }
 
@@ -125,7 +165,11 @@ std::unique_ptr<PahoMqttClient> PahoMqttClient::make_unique(
 }
 
 //=============================================================================
-PahoMqttClient::~PahoMqttClient() = default;
+PahoMqttClient::~PahoMqttClient()
+{
+  // Destroy the Paho client first, as its pending callbacks use the members.
+  client_.reset();
+}
 
 //=============================================================================
 void PahoMqttClient::connect()
@@ -193,7 +237,7 @@ void PahoMqttClient::subscribe(
 {
   {
     std::lock_guard<std::mutex> lock(handler_mutex_);
-    handlers_[topic] = handler;
+    handlers_[topic] = Subscription{handler, qos};
   }
   try
   {
@@ -210,11 +254,13 @@ void PahoMqttClient::subscribe(
 //=============================================================================
 void PahoMqttClient::unsubscribe(const std::string& topic)
 {
+  {
+    std::lock_guard<std::mutex> lock(handler_mutex_);
+    handlers_.erase(topic);
+  }
   try
   {
     client_->unsubscribe(topic)->wait();
-    std::lock_guard<std::mutex> lock(handler_mutex_);
-    handlers_.erase(topic);
   }
   catch (const mqtt::exception& e)
   {

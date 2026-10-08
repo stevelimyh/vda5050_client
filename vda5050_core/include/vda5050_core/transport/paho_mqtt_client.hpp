@@ -54,6 +54,17 @@ protected:
 };
 
 //=============================================================================
+class MqttResubscribeListener : public mqtt::iaction_listener
+{
+protected:
+  // Documentation inherited from mqtt::iaction_listener
+  void on_failure(const mqtt::token& tok) override;
+
+  // Documentation inherited from mqtt::iaction_listener
+  void on_success(const mqtt::token& tok) override;
+};
+
+//=============================================================================
 class MqttCallback : public mqtt::callback
 {
 public:
@@ -161,11 +172,21 @@ private:
   /// \brief Implementation of action listener
   MqttActionListener action_listener_;
 
+  /// \brief Listener for the re-subscribe sent on reconnect
+  MqttResubscribeListener resubscribe_listener_;
+
   /// \brief Implementation of callback
   MqttCallback callback_;
 
-  /// \brief List of message handlers mapped to topics
-  std::unordered_map<std::string, MessageHandler> handlers_;
+  /// \brief Message handler and QoS of a subscribed topic
+  struct Subscription
+  {
+    MessageHandler handler;
+    int qos;
+  };
+
+  /// \brief List of subscriptions mapped to topics
+  std::unordered_map<std::string, Subscription> handlers_;
 
   /// \brief Mutex protecting list of message handlers
   std::mutex handler_mutex_;
